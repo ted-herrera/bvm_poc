@@ -1,0 +1,2678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CSOps Gatekeeper — Best Version Media</title>
+<!-- xlsx.js removed: file parsing is now handled by the Flask backend -->
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#f1f5f9;min-height:100vh;font-family:'Inter',system-ui,sans-serif;color:#0f172a;}
+:root{
+  --navy:#243454;--navy-dark:#1a2740;--navy-mid:#2e4068;--navy-pale:#eef1f7;
+  --card:#fff;--card-alt:#f8fafc;--border:#e2e8f0;--border-mid:#cbd5e1;
+  --text:#0f172a;--text-mid:#374151;--text-muted:#64748b;--text-light:#94a3b8;
+  --success:#16a34a;--success-bg:#f0fdf4;--success-border:#bbf7d0;
+  --warning:#d97706;--warning-bg:#fffbeb;--warning-border:#fde68a;
+  --danger:#dc2626;--danger-bg:#fef2f2;--danger-border:#fecaca;
+  --blue:#2563eb;--blue-bg:#eff6ff;--blue-border:#bfdbfe;
+  --purple:#7c3aed;--purple-bg:#f5f3ff;--purple-border:#ddd6fe;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes marquee{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.ticker-wrap{overflow:hidden;background:#1a2740;border-top:1px solid rgba(255,255,255,0.1);padding:0;}
+.ticker-inner{display:flex;white-space:nowrap;animation:marquee 32s linear infinite;}
+.ticker-item{padding:7px 22px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:rgba(255,255,255,0.75);letter-spacing:0.06em;border-right:1px solid rgba(255,255,255,0.1);flex-shrink:0;}
+.ticker-pos{color:#4ade80;}.ticker-neg{color:#f87171;}.ticker-mute{color:rgba(255,255,255,0.35);margin-right:6px;}
+.demo-banner{background:linear-gradient(90deg,#d97706,#b45309);color:#fff;text-align:center;padding:6px 16px;font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;}
+.fade{animation:fadeUp 0.25s ease}
+.slot{transition:all 0.2s;cursor:pointer;}
+.slot:hover{border-color:var(--navy)!important;background:var(--navy-pale)!important;}
+.tab-btn{background:none;border:none;cursor:pointer;transition:all 0.15s;white-space:nowrap;font-family:'Inter',system-ui,sans-serif;}
+.tab-btn:hover{color:var(--navy)!important;}
+.seg-row:hover{background:var(--navy-pale)!important;}
+.guide-btn{transition:all 0.15s;}
+.guide-btn:hover{border-color:var(--navy)!important;background:var(--navy-pale)!important;}
+select,input,textarea{font-family:'Inter',system-ui,sans-serif;}
+select:focus,input:focus,textarea:focus{outline:2px solid #24345444;outline-offset:1px;}
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:2px;}
+.pill{display:inline-flex;align-items:center;border-radius:20px;padding:2px 9px;font-size:10px;font-weight:600;letter-spacing:0.07em;text-transform:uppercase;border:1px solid;}
+.mcard{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:14px 16px;}
+.mcard .label{font-size:10px;font-weight:600;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:6px;}
+.mcard .value{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;line-height:1;}
+.mcard .sub{font-size:10px;color:var(--text-light);margin-top:5px;}
+.sl{display:flex;align-items:center;gap:8px;margin-bottom:14px;}
+.sl::before{content:'';width:3px;height:16px;background:var(--navy);border-radius:2px;flex-shrink:0;}
+.sl span{font-size:12px;font-weight:700;color:var(--navy);letter-spacing:0.08em;text-transform:uppercase;}
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+
+<script>
+// ============================================================
+// CONSTANTS
+// ============================================================
+const NAVY='#243454',NAVY_DARK='#1a2740',NAVY_MID='#2e4068',NAVY_PALE='#eef1f7';
+const BANDWIDTH_CEILING=500;
+const WEEK_LABEL='Current Week';
+
+const CS_REPS={
+  'Kala McNeely':'kmcneely',
+  'Samantha Marcus':'samanthamarcus',
+  'Genele Ekinde':'gekinde',
+  'Karen Guirguis':'kguirguis',
+  'April Dippolito':'adippolito',
+  'Alex Polivka':'apolivka'
+};
+const CS_REP_NAMES=Object.keys(CS_REPS);
+
+// ── GRR Contest April 1 – December 31 2026 ──────────────────────
+const CONTEST_START_DATE=new Date('2026-04-01');
+const CONTEST_TEAM1=['Kala McNeely','Karen Guirguis','Genele Ekinde'];
+const CONTEST_TEAM2=['Samantha Marcus','April Dippolito','Alex Polivka'];
+const CONTEST_BOB={
+  'Kala McNeely':8600000,'Karen Guirguis':5400000,'Genele Ekinde':5300000,
+  'Samantha Marcus':11000000,'April Dippolito':3300000,'Alex Polivka':4200000
+};
+
+const CSOPS_SYSTEM=`You are Bruno. Execution partner for CSOps at Best Version Media. RUN HANK = Layer 1 truth. RUN BRUNO = Layer 2 evaluation. Never recalculate Layer 1 metrics. Coaching covers all 6 reps. Kala McNeely and Samantha Marcus coach directly from this document. All actions executable Monday morning. Flag any metric derived from unpopulated penetration fields as ESTIMATED.`;
+
+const DROPDOWN={
+  contacted:['','Yes','No'],
+  contactType:['','Call','Email','Virtual Meeting','Text'],
+  status:['','Active Conversation','No Response','Save Closed','Declined Confirmed','Escalated'],
+  blocker:['','Price','Timing','Decision Maker','No Response','Competition','Other'],
+  saveOfferOutcome:['','Accepted','Rejected','Pending','No Offer Extended'],
+  idp:['','Yes','No']
+};
+
+// ============================================================
+// STATE
+// ============================================================
+let state={
+  files:{},
+  hankDone:false,
+  hankRunning:false,
+  hankStep:0,
+  hankError:null,
+  brunoOpen:false,
+  brunoRunning:false,
+  brunoOutput:null,
+  brunoError:null,
+  brunoGuideStep:0,
+  dlDone:false,
+  activeTab:0,
+  segCategory:'declined',
+  manualContexts:{},
+  pack:null,      // the processed data from RUN HANK
+  segData:{declined:[],printOnly:[],renewable:[]},
+  upsellLog:[],   // GRR contest upsell entries (session memory)
+  secs:0,
+  timer:null,
+  demoMode:false
+};
+
+// ============================================================
+// UTILITY
+// ============================================================
+const $=id=>document.getElementById(id);
+const ini=n=>(n||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+const fmt$=v=>v==null||isNaN(v)?'—':'$'+Number(v).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0});
+const fmtPct=v=>v==null||isNaN(v)?'—':Number(v).toFixed(1)+'%';
+const tierColor=t=>{if(!t)return'#64748b';const v=t.toLowerCase();if(v.includes('excellent'))return'#16a34a';if(v.includes('healthy'))return'#2563eb';if(v.includes('watchlist'))return'#d97706';if(v.includes('risk'))return'#dc2626';return'#64748b';};
+const tierBg=t=>{if(!t)return'#fff';const v=t.toLowerCase();if(v.includes('excellent'))return'#f0fdf4';if(v.includes('healthy'))return'#eff6ff';if(v.includes('watchlist'))return'#fffbeb';if(v.includes('risk'))return'#fef2f2';return'#fff';};
+const healthTier=s=>{if(s>=85)return'Excellent';if(s>=70)return'Healthy';if(s>=55)return'Watchlist';return'At Risk';};
+// 4-Factor helpers — used at render time so engagement updates live
+const engPts=row=>{const c=row.contacted==='Yes';const s=!!(row.statusField&&String(row.statusField).trim());const n=!!(row.nextStep&&String(row.nextStep).trim());return c&&s&&n?10:c&&s?6:c?3:0;};
+const clientHealthScore=row=>(row._health_base||0)+engPts(row);
+
+function startTimer(){
+  clearInterval(state.timer);
+  const t0=Date.now();
+  state.timer=setInterval(()=>{
+    state.secs=((Date.now()-t0)/1000).toFixed(1);
+    const el=$('timer-display');
+    if(el)el.textContent=state.secs+'s';
+  },100);
+}
+function stopTimer(){clearInterval(state.timer);state.secs=0;}
+
+// ============================================================
+// FILE READING
+// ============================================================
+function readXlsx(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=e=>{
+      try{
+        const wb=XLSX.read(e.target.result,{type:'array',cellDates:true});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        const data=XLSX.utils.sheet_to_json(ws,{defval:null});
+        resolve(data);
+      }catch(err){reject(err);}
+    };
+    reader.onerror=reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function readTextFile(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=e=>resolve(e.target.result);
+    reader.onerror=reject;
+    reader.readAsText(file);
+  });
+}
+
+// ============================================================
+// AGREEMENT NUMBER EXTRACTION
+// ============================================================
+function extractAgreementNumber(str){
+  if(!str)return null;
+  // Match E-XXXXXX pattern (with optional suffix like -1, -2)
+  const match=String(str).match(/E-\d+(?:-\d+)?/i);
+  return match?match[0].toUpperCase():null;
+}
+
+// ============================================================
+// CSOPS REP MATCHING
+// ============================================================
+function matchCSOpsRep(repField){
+  if(!repField)return null;
+  const rf=String(repField).toLowerCase();
+  for(const name of CS_REP_NAMES){
+    const parts=name.toLowerCase().split(' ');
+    if(parts.every(p=>rf.includes(p)))return name;
+    // Also match by email prefix
+    const emailKey=CS_REPS[name];
+    if(rf.includes(emailKey))return name;
+  }
+  return null;
+}
+
+// ============================================================
+// BASELINE PARSING FROM PRIOR PACK
+// ============================================================
+function parseBaseline(text){
+  const match=text.match(/Portfolio Baseline:\s*\$?([\d,]+)/);
+  if(match){
+    return parseFloat(match[1].replace(/,/g,''));
+  }
+  return null;
+}
+
+function parsePriorDeclinedByRep(text){
+  // Parse per-rep declined from prior pack health scorecard section
+  const result={};
+  const lines=text.split('\n');
+  let inHealth=false;
+  for(const line of lines){
+    if(line.includes('HEALTH SCORECARD'))inHealth=true;
+    if(inHealth&&line.includes('SEGMENTATION'))break;
+    if(inHealth){
+      for(const name of CS_REP_NAMES){
+        if(line.includes(name)){
+          const dMatch=line.match(/Declined \$([\d,]+)/);
+          if(dMatch)result[name]=parseFloat(dMatch[1].replace(/,/g,''));
+        }
+      }
+    }
+  }
+  return result;
+}
+
+// ============================================================
+// FLIP PIPELINE STAGING
+// ============================================================
+function getFlipStage(pctToBaseline){
+  const p=parseFloat(pctToBaseline);
+  if(isNaN(p)||p<0.85)return{stage:'Stage 1',label:'No Contact',stageNum:1};
+  if(p<0.90)return{stage:'Stage 2',label:'85% Intro',stageNum:2};
+  if(p<0.95)return{stage:'Stage 3',label:'90% Align',stageNum:3};
+  return{stage:'Stage 4',label:'95% Handoff',stageNum:4};
+}
+
+// ============================================================
+// MAIN HANK PROCESSING ENGINE
+// Accepts pre-parsed data returned by the Flask /process endpoint.
+// ============================================================
+async function processHank(parsedData){
+  const setStep=i=>{state.hankStep=i;renderHankProgress();};
+
+  // STEP 0: Data received from server — assign to local variables
+  setStep(0);
+  await sleep(200);
+  const renewalData=parsedData.renewal_rows||[];
+  const pastDueData=parsedData.past_due_rows||[];
+  const gtpData=parsedData.gtp_rows||[];
+  const cancellationData=parsedData.cancellation_rows||[];
+  const priorPackText=parsedData.exec_pack_text||null;
+  const priorPackBaseline=priorPackText?parseBaseline(priorPackText):null;
+  const priorDeclinedByRep=priorPackText?parsePriorDeclinedByRep(priorPackText):{};
+
+  // STEP 1: Filter to CS reps, deduplicate on Contract #
+  setStep(1);
+  await sleep(400);
+  const seen=new Set();
+  const csRows=[];
+  for(const row of renewalData){
+    const repName=matchCSOpsRep(row['Rep']);
+    if(!repName)continue;
+    const contractNum=row['Contract #']||row['Agreement']||row['Agreement Number'];
+    if(!contractNum)continue;
+    const key=String(contractNum).trim().toUpperCase();
+    if(seen.has(key))continue;
+    seen.add(key);
+    csRows.push({...row,_rep:repName,_contractKey:key});
+  }
+
+  // STEP 2: Baseline & WOW
+  setStep(2);
+  await sleep(400);
+  // Portfolio Baseline: locked constant from server — never derived from the file total
+  const currentTotal=csRows.reduce((s,r)=>s+parseFloat(r['Subtotal Sales']||0),0);
+  const portfolioBaseline=parsedData.annual_baseline;
+  const wowDelta=priorPackBaseline?(currentTotal-priorPackBaseline):0;
+  const wowDeltaPct=priorPackBaseline?(wowDelta/priorPackBaseline*100):0;
+  const exportFlag=currentTotal>=(portfolioBaseline*0.80)?'OK':'CRITICAL EXPORT GAP';
+  const isWeek1=!priorPackBaseline;
+
+  // STEP 3: Digital detection
+  setStep(3);
+  await sleep(400);
+  const isDigital=row=>{
+    const si=String(row['Sale Items']||'').toLowerCase();
+    return si.includes('digital')||si.includes('listings')||si.includes('google')||si.includes('meta');
+  };
+
+  // STEP 4: Segmentation — Declined > Print Only > Renewable
+  setStep(4);
+  await sleep(400);
+  const declined=[],printOnly=[],renewable=[];
+  for(const row of csRows){
+    const status=String(row['Renew Status']||'').trim();
+    const subtotal=parseFloat(row['Subtotal Sales']||0);
+    const digital=isDigital(row);
+    const saleItems=String(row['Sale Items']||'');
+    const base={
+      agreementNum:row._contractKey,
+      client:String(row['Client']||''),
+      rep:row._rep,
+      subtotal,
+      renewStatus:status,
+      saleItems,
+      digital:digital?'Digital':'Print',
+      lastEdition:row['Last Edition']||null,
+      attritionCause:row['Attrition Cause']||'',
+      saveOffer:row['Save Offer']||'',
+      // penetration fields
+      contacted:'',contactType:'',contactDate:'',statusField:'',
+      blocker:'',nextStep:'',nextStepDate:'',outcome:'',idp:'',notes:'',
+      saveOfferOutcome:'',
+      declineTrend:'—',
+      formType:'',formAttritionReason:'',formNotes:''
+    };
+    if(status==='Declined'){declined.push({...base,segment:'Declined'});}
+    else if(!digital&&saleItems.toLowerCase().includes('print')&&!saleItems.toLowerCase().includes('digital')&&!saleItems.toLowerCase().includes('listings')){
+      printOnly.push({...base,segment:'Print Only Upsell'});
+    }
+    else if(status==='Renewable'||status==='Renew Eligible'){
+      renewable.push({...base,segment:'Renewable'});
+    }
+  }
+
+  // STEP 5: Build top 20 lists per rep, ranked by subtotal desc, alpha by rep
+  setStep(5);
+  await sleep(400);
+  const buildTop20=(arr)=>{
+    const byRep={};
+    for(const name of CS_REP_NAMES.sort())byRep[name]=[];
+    for(const row of arr){if(byRep[row.rep])byRep[row.rep].push(row);}
+    const result=[];
+    for(const name of CS_REP_NAMES.sort()){
+      const sorted=byRep[name].sort((a,b)=>b.subtotal-a.subtotal).slice(0,20);
+      result.push(...sorted);
+    }
+    return result;
+  };
+  const declinedList=buildTop20(declined);
+  const printOnlyList=buildTop20(printOnly);
+  const renewableList=buildTop20(renewable);
+
+  // STEP 6: Match cancellation form to declined accounts
+  setStep(6);
+  await sleep(400);
+  const cancellationMap={};
+  for(const row of cancellationData){
+    // Column indices based on our analysis:
+    // Col 0=timestamp, 1=rep email, 2=agreement/client combined, 3=region, 4=edition
+    // 5=form type, 6=last edition, 7=attrition reason(decline), 8=save offer, 9=notes
+    // 10=cancellation reason, 11=cancellation sub-reason, 12=save offer(cancellation)
+    const vals=Object.values(row);
+    const combined=vals[2]?String(vals[2]):'';
+    const agNum=extractAgreementNumber(combined);
+    if(!agNum)continue;
+    const formType=vals[5]?String(vals[5]).trim():'';
+    const attritionReason=formType==='DECLINE RENEWAL'?(vals[7]?String(vals[7]):''):(vals[10]?String(vals[10]):'');
+    const saveOfferVal=formType==='DECLINE RENEWAL'?(vals[8]?String(vals[8]):''):(vals[12]?String(vals[12]):'');
+    const notesVal=vals[9]?String(vals[9]):'';
+    cancellationMap[agNum]={formType,attritionReason,saveOffer:saveOfferVal,notes:notesVal};
+  }
+
+  // Apply cancellation data to declined list
+  for(const row of declinedList){
+    const cf=cancellationMap[row.agreementNum];
+    if(cf){
+      row.formType=cf.formType;
+      row.formAttritionReason=cf.attritionReason;
+      row.formNotes=cf.notes;
+      if(cf.saveOffer&&!row.saveOffer)row.saveOffer=cf.saveOffer;
+    }
+  }
+
+  // STEP 7: Per-client 4-Factor Health Score
+  // Factor 1: Renew Status   40 pts  (Renewable=40, Merged=20, Declined=0)
+  // Factor 2: Payment Health 30 pts  (not past due=30, 0-30d=22, 31-60d=15, 61-90d=8, 90+/legal=0)
+  // Factor 3: Digital        20 pts  (digital=20, print only=0)
+  // Factor 4: Engagement     10 pts  (live from Segmentation fields via engPts/clientHealthScore)
+  // _health_base = f1+f2+f3 stored on every row; full score = _health_base + engPts(row) at render time
+  setStep(7);
+  await sleep(400);
+
+  // Build past-due lookup keyed by agreement number
+  const pdAgrLookup={};
+  for(const pd of pastDueData){
+    const agr=String(pd['Agreement']||pd['Contract #']||pd['Agreement Number']||'').trim().toUpperCase();
+    if(!agr)continue;
+    const d0_30=parseFloat(pd['Monthly 0 - 30']||0);
+    const d31_60=parseFloat(pd['Monthly 31 - 60']||0);
+    const d61_90=parseFloat(pd['Monthly 61 - 90']||0);
+    const d90p=parseFloat(pd['Monthly 91 - 120']||0)+parseFloat(pd['Monthly 121 - 150']||0)+parseFloat(pd['Monthly 150+']||0);
+    const legal=String(pd['Legal']||'').trim().toLowerCase()==='yes';
+    pdAgrLookup[agr]={d0_30,d31_60,d61_90,d90p,legal};
+  }
+  const payPts=key=>{
+    const pd=pdAgrLookup[String(key||'').toUpperCase()];
+    if(!pd)return 30;
+    if(pd.legal||pd.d90p>0)return 0;
+    if(pd.d61_90>0)return 8;
+    if(pd.d31_60>0)return 15;
+    if(pd.d0_30>0)return 22;
+    return 30;
+  };
+
+  // Phase 1: annotate every csRow with _health_base (f1+f2+f3); build key→base lookup
+  const healthBaseByKey={};
+  for(const r of csRows){
+    const st=String(r['Renew Status']||'').trim();
+    const f1=st==='Renewable'?40:st==='Merged'?20:0;
+    const f2=payPts(r._contractKey);
+    const f3=isDigital(r)?20:0;
+    r._health_base=f1+f2+f3;
+    healthBaseByKey[r._contractKey]=r._health_base;
+  }
+
+  // Phase 2: apply _health_base to seg rows (they are new objects, not csRow references)
+  for(const r of [...declinedList,...printOnlyList,...renewableList]){
+    r._health_base=healthBaseByKey[r.agreementNum]??0;
+  }
+
+  // Phase 3: repMetrics from csRows (_health_base only; engPts=0 at run time)
+  const repMetrics={};
+  for(const name of CS_REP_NAMES){
+    const repRows=csRows.filter(r=>r._rep===name);
+    const inScope=repRows.reduce((s,r)=>s+parseFloat(r['Subtotal Sales']||0),0);
+    const declinedRev=repRows.filter(r=>String(r['Renew Status']).trim()==='Declined').reduce((s,r)=>s+parseFloat(r['Subtotal Sales']||0),0);
+    const digitalRev=repRows.filter(r=>isDigital(r)).reduce((s,r)=>s+parseFloat(r['Subtotal Sales']||0),0);
+    const riskPct=inScope>0?(declinedRev/inScope*100):0;
+    const digitalMix=inScope>0?(digitalRev/inScope*100):0;
+    let declineTrend='—';
+    if(!isWeek1&&priorDeclinedByRep[name]!=null){
+      const delta=declinedRev-priorDeclinedByRep[name];
+      if(delta>0)declineTrend='▲';
+      else if(delta<0)declineTrend='▼';
+    }
+    const n=Math.max(repRows.length,1);
+    const healthScore=repRows.reduce((s,r)=>s+r._health_base,0)/n;
+    repMetrics[name]={
+      rep:name,inScope,declinedRev,digitalRev,riskPct,digitalMix,
+      healthScore,healthTier:healthTier(healthScore),declineTrend,isWeek1
+    };
+  }
+
+  // Apply decline trend to seg rows
+  for(const row of [...declinedList,...printOnlyList,...renewableList]){
+    row.declineTrend=repMetrics[row.rep]?.declineTrend||'—';
+  }
+
+  // STEP 8: Bandwidth
+  setStep(8);
+  await sleep(400);
+  const bandwidth={};
+  for(const name of CS_REP_NAMES){
+    const repRenewable=new Set(
+      csRows.filter(r=>r._rep===name&&String(r['Renew Status']).trim()==='Renewable')
+            .map(r=>String(r['Client']||r['client']||'').trim())
+            .filter(Boolean)
+    ).size;
+    const repDeclined=new Set(
+      csRows.filter(r=>r._rep===name&&String(r['Renew Status']).trim()==='Declined')
+            .map(r=>String(r['Client']||r['client']||'').trim())
+            .filter(Boolean)
+    ).size;
+    // Cancelled: precomputed server-side — unique clients per rep with Cancelled status
+    const repCancelled=(parsedData.cancelled_clients_by_rep&&parsedData.cancelled_clients_by_rep[name])||0;
+    const active=repRenewable+repDeclined-repCancelled;
+    bandwidth[name]={rep:name,renewable:repRenewable,declined:repDeclined,cancelled:repCancelled,active,over:active>BANDWIDTH_CEILING};
+  }
+
+  // STEP 9: Renewal concentration (30/60/90 days)
+  setStep(9);
+  await sleep(400);
+  const now=new Date();
+  const d30=new Date(now);d30.setDate(d30.getDate()+30);
+  const d60=new Date(now);d60.setDate(d60.getDate()+60);
+  const d90=new Date(now);d90.setDate(d90.getDate()+90);
+  const renewalConc={};
+  for(const name of CS_REP_NAMES){
+    const repRenewableRows=csRows.filter(r=>r._rep===name&&String(r['Renew Status']).trim()==='Renewable');
+    let n30=0,n60=0,n90=0,maxDollar=0;
+    for(const row of repRenewableRows){
+      let le=row['Last Edition'];
+      if(le&&!(le instanceof Date)){try{le=new Date(le);}catch(e){le=null;}}
+      if(le&&le instanceof Date&&!isNaN(le)){
+        if(le<=d30)n30++;
+        if(le<=d60)n60++;
+        if(le<=d90)n90++;
+      }
+      const sub=parseFloat(row['Subtotal Sales']||0);
+      if(sub>maxDollar)maxDollar=sub;
+    }
+    renewalConc[name]={next30:n30,next60:n60,next90:n90,highestDollar:maxDollar};
+  }
+
+  // STEP 10: Past Due — match to CS reps
+  setStep(10);
+  await sleep(400);
+  const pastDueByRep={};
+  for(const name of CS_REP_NAMES)pastDueByRep[name]=[];
+  for(const row of pastDueData){
+    const repName=matchCSOpsRep(row['Rep']);
+    if(!repName)continue;
+    pastDueByRep[repName].push({
+      agreement:row['Agreement'],
+      client:row['Client'],
+      totalDue:parseFloat(row['Total Due']||0),
+      d0_30:parseFloat(row['Monthly 0 - 30']||0),
+      d31_60:parseFloat(row['Monthly 31 - 60']||0),
+      d61_90:parseFloat(row['Monthly 61 - 90']||0),
+      d91_120:parseFloat(row['Monthly 91 - 120']||0),
+      d121_150:parseFloat(row['Monthly 121 - 150']||0),
+      d150plus:parseFloat(row['Monthly 150+']||0),
+      pastDueReason:row['Past Due Reason']||'',
+      legal:row['Legal']==='Yes',
+      collections:row['Collections']==='Yes',
+      adPulled:row['Ad Pulled']?true:false
+    });
+  }
+
+  // STEP 11: Flip pipeline
+  setStep(11);
+  await sleep(400);
+  const flipPubs=gtpData.filter(r=>r['Flip']&&String(r['Flip']).trim().toLowerCase()==='yes'||false);
+  // Also include all going-to-print pubs for staging
+  const allGtpPubs=gtpData.map(r=>({
+    publication:r['Publication']||'',
+    publisher:r['Publisher']||'',
+    region:r['Region']||'',
+    division:r['Division']||'',
+    pctToBaseline:r['% to Baseline']||0,
+    flip:r['Flip']?String(r['Flip']).trim():'',
+    onDeckStatus:r['On Deck Status']||'',
+    ...getFlipStage(r['% to Baseline'])
+  }));
+
+  const flipOnly=allGtpPubs.filter(p=>p.flip.toLowerCase()==='yes'||p.flip==='Yes');
+  const stageCounts={1:0,2:0,3:0,4:0};
+  for(const p of allGtpPubs)stageCounts[p.stageNum]=(stageCounts[p.stageNum]||0)+1;
+
+  // STEP 12: Coaching summary generation
+  setStep(12);
+  await sleep(600);
+  const teamHealthScore=Object.values(repMetrics).reduce((s,r)=>s+r.healthScore,0)/CS_REP_NAMES.length;
+  const totalDeclined=Object.values(repMetrics).reduce((s,r)=>s+r.declinedRev,0);
+  const totalDigitalMix=currentTotal>0?(Object.values(repMetrics).reduce((s,r)=>s+r.digitalRev,0)/currentTotal*100):0;
+  const overCeiling=Object.values(bandwidth).filter(b=>b.over);
+
+  // Generate coaching directives per rep
+  const coachingActions={};
+  for(const name of CS_REP_NAMES){
+    const m=repMetrics[name];
+    const bw=bandwidth[name];
+    const rc=renewalConc[name];
+    const pd=pastDueByRep[name];
+    const totalPastDue=pd.reduce((s,r)=>s+r.totalDue,0);
+    const legalFlags=pd.filter(r=>r.legal).length;
+    const actions=[];
+    // Declined action
+    const declinedCount=declinedList.filter(r=>r.rep===name).length;
+    if(m.declinedRev>0){
+      actions.push(`Declined exposure at ${fmt$(m.declinedRev)} across ${declinedCount} accounts in the top 20 list. Pull by dollar, make contact, log outcome and Next Step for each before Friday.`);
+    }
+    // Save target
+    const saveTarget=bw.active>450?3:bw.declined>150?2:1;
+    actions.push(`Target minimum ${saveTarget} closed save${saveTarget>1?'s':''} this week. Save Closed must be logged in the Outcome field. Contact attempts without closure do not count toward the directive.`);
+    // Digital
+    if(m.digitalMix<30){
+      const gap=(30-m.digitalMix).toFixed(1);
+      actions.push(`Digital mix at ${fmtPct(m.digitalMix)} — ${gap} points below 30% target. Identify ${m.digitalMix<20?5:3} print-only accounts for attach conversation. Log contact date and outcome.`);
+    }
+    // Renewal concentration
+    if(rc.next30>20){
+      actions.push(`${rc.next30} renewable accounts expiring in 30 days. Highest single account at ${fmt$(rc.highestDollar)}. Work these proactively — do not let renewals lapse without a documented conversation.`);
+    }
+    // Past due
+    if(totalPastDue>0){
+      actions.push(`${fmt$(totalPastDue)} in past due balance across ${pd.length} account${pd.length>1?'s':''}${legalFlags>0?` — ${legalFlags} with legal flag, escalate immediately`:''}.`);
+    }
+    // Bandwidth
+    if(bw.over){
+      actions.push(`Active account count at ${bw.active} — ${bw.active-BANDWIDTH_CEILING} over the ${BANDWIDTH_CEILING} ceiling. Prioritization is not optional this week. Declined book must move — saves close or cancellations process.`);
+    }
+    coachingActions[name]=actions;
+  }
+
+  // STEP 13: Lock pack
+  setStep(13);
+  await sleep(400);
+
+  // Assemble final pack
+  const pack={
+    week:WEEK_LABEL,
+    weekDate:new Date().toLocaleDateString(),
+    isWeek1,
+    dashboard:(()=>{
+      const rm=parsedData.revenue_metrics||{};
+      return{
+        portfolioBaseline,
+        currentFileTotal:currentTotal,
+        wowDelta,
+        wowDeltaPct,
+        totalDeclined,
+        riskPct:portfolioBaseline>0?(totalDeclined/portfolioBaseline*100):0,
+        digitalMix:totalDigitalMix,
+        healthScore:teamHealthScore,
+        healthTier:healthTier(teamHealthScore),
+        exportFlag,
+        healthModel:'4-Factor Model — Renew 40 / Payment 30 / Digital 20 / Engagement 10',
+        // Revenue metrics from server
+        teamMrr:rm.team_mrr||0,
+        teamArr:rm.team_arr||0,
+        teamTcv:rm.team_tcv||0,
+        declinedMrr:rm.declined_mrr||0,
+        declinedArr:rm.declined_arr||0,
+        declinedTcv:rm.declined_tcv||0,
+        digitalMrrMix:rm.digital_mrr_mix||0,
+      };
+    })(),
+    health:CS_REP_NAMES.map(n=>repMetrics[n]),
+    bandwidth:CS_REP_NAMES.map(n=>bandwidth[n]),
+    renewalConc:CS_REP_NAMES.map(n=>({rep:n,...renewalConc[n]})),
+    coachingActions,
+    pastDueByRep,
+    flipPipeline:{stageCounts,flipPublications:flipOnly,allPubs:allGtpPubs},
+    segCounts:{
+      declined:{count:declined.length,revenue:declined.reduce((s,r)=>s+r.subtotal,0)},
+      printOnly:{count:printOnly.length,revenue:printOnly.reduce((s,r)=>s+r.subtotal,0)},
+      renewable:{count:renewable.length,revenue:renewable.reduce((s,r)=>s+r.subtotal,0)}
+    },
+    validations:parsedData.validations||[],
+    validationSummary:parsedData.validation_summary||{total_checks:0,passed:0,warned:0,failed:0,overall_status:'CLEAN'},
+    declinePerformance:parsedData.decline_performance||[],
+    declinePerformanceSummary:parsedData.decline_performance_summary||{},
+    cancellationPendingCount:parsedData.cancellation_pending_count||0,
+    renewalLookup:(()=>{const m={};for(const r of csRows)m[r._contractKey]={client:String(r['Client']||''),subtotal:parseFloat(r['Subtotal Sales']||0),rep:r._rep};return m;})(),
+  };
+
+  state.pack=pack;
+  state.segData={declined:declinedList,printOnly:printOnlyList,renewable:renewableList};
+
+  setStep(14);
+  await sleep(300);
+}
+
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+
+// ── ESRI helpers ─────────────────────────────────────────────
+function sparkPoints(name,score){
+  // Deterministic pseudo-random 8-week spark ending at current score
+  let seed=name.split('').reduce((a,c)=>a+c.charCodeAt(0),0);
+  const rng=()=>{seed=(seed*9301+49297)%233280;return seed/233280;};
+  const pts=[];
+  let v=Math.max(30,score+(rng()-0.5)*30);
+  for(let i=0;i<7;i++){v=Math.max(20,Math.min(100,v+(rng()-0.45)*12));pts.push(v);}
+  pts.push(score);
+  return pts;
+}
+
+let _riskMap=null;
+function initRiskMap(riskPct){
+  const el=document.getElementById('risk-map-container');
+  if(!el)return;
+  if(_riskMap){_riskMap.remove();_riskMap=null;}
+  _riskMap=L.map('risk-map-container',{
+    zoomControl:false,attributionControl:false,
+    dragging:true,scrollWheelZoom:false,
+    doubleClickZoom:false,boxZoom:false,keyboard:false
+  }).setView([39.5,-98.35],3);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:10}).addTo(_riskMap);
+  const r=Math.min(riskPct||0,100)/100;
+  const col=v=>{
+    if(v<0.15)return'#4ade80';
+    if(v<0.30)return'#a3e635';
+    if(v<0.50)return'#facc15';
+    if(v<0.70)return'#fb923c';
+    return'#ef4444';
+  };
+  const regions=[
+    {name:'West',   bounds:[[32,-124],[49,-104]],i:r*0.55},
+    {name:'Midwest',bounds:[[36,-104],[49,-80]], i:r*0.90},
+    {name:'NE',     bounds:[[40,-80], [47,-67]], i:r*1.05},
+    {name:'SW',     bounds:[[25,-124],[36,-94]], i:r*0.50},
+    {name:'South',  bounds:[[25,-94], [36,-77]], i:r*0.72},
+    {name:'SE',     bounds:[[25,-82], [36,-67]], i:r*0.85},
+  ];
+  regions.forEach(({name,bounds,i})=>{
+    L.rectangle(bounds,{
+      color:'white',weight:1.5,
+      fillColor:col(Math.min(i,1)),fillOpacity:0.75
+    }).bindTooltip('<b>'+name+'</b> &mdash; Risk: '+Math.round(i*100)+'%',{sticky:true}).addTo(_riskMap);
+  });
+}
+
+function buildDemoPack(){
+  const today=new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  const BASE=35989090,BOB=34150000,DEC=4980000;
+  const DEMO_HEALTH=[
+    {rep:'Kala McNeely',   healthScore:59.8,healthTier:'Watchlist',riskPct:38.2,digitalMix:24.5,declineTrend:'up'},
+    {rep:'Samantha Marcus',healthScore:72.1,healthTier:'Healthy',  riskPct:21.4,digitalMix:33.8,declineTrend:'flat'},
+    {rep:'Genele Ekinde',  healthScore:56.4,healthTier:'Watchlist',riskPct:41.7,digitalMix:19.2,declineTrend:'up'},
+    {rep:'Karen Guirguis', healthScore:63.0,healthTier:'Watchlist',riskPct:34.5,digitalMix:28.1,declineTrend:'down'},
+    {rep:'April Dippolito',healthScore:47.3,healthTier:'At Risk',  riskPct:51.2,digitalMix:14.7,declineTrend:'up'},
+    {rep:'Alex Polivka',   healthScore:74.5,healthTier:'Healthy',  riskPct:18.9,digitalMix:36.2,declineTrend:'down'},
+  ];
+  const DEMO_BW=[
+    {rep:'Kala McNeely',   active:312,renewable:248,declined:96,cancelled:32, over:false},
+    {rep:'Samantha Marcus',active:389,renewable:271,declined:142,cancelled:24,over:false},
+    {rep:'Genele Ekinde',  active:187,renewable:141,declined:68,cancelled:22, over:false},
+    {rep:'Karen Guirguis', active:224,renewable:179,declined:74,cancelled:29, over:false},
+    {rep:'April Dippolito',active:157,renewable:108,declined:81,cancelled:32, over:false},
+    {rep:'Alex Polivka',   active:211,renewable:168,declined:65,cancelled:22, over:false},
+  ];
+  const DEMO_CONC=[
+    {rep:'Kala McNeely',   next30:18,next60:42,next90:89, highestDollar:48000},
+    {rep:'Samantha Marcus',next30:26,next60:61,next90:118,highestDollar:72000},
+    {rep:'Genele Ekinde',  next30:11,next60:28,next90:54, highestDollar:36000},
+    {rep:'Karen Guirguis', next30:14,next60:33,next90:68, highestDollar:42000},
+    {rep:'April Dippolito',next30:9, next60:21,next90:41, highestDollar:28000},
+    {rep:'Alex Polivka',   next30:13,next60:31,next90:62, highestDollar:38000},
+  ];
+  const COACHING={
+    'Kala McNeely':['Contact all 12 high-value declined accounts this week','Schedule save conversations for accounts expiring in 30 days','Push digital upsell conversation on print-only renewals','Flag ceiling risk — 312 active, 188 headroom remaining'],
+    'Samantha Marcus':['Maintain momentum on 271 renewable accounts','Drive digital mix above 30% — currently 33.8%, hold the line','Escalate 3 accounts past 90-day threshold to management','Prep biweekly report for leadership review Friday'],
+    'Genele Ekinde':['Prioritize 68 declined accounts — highest risk exposure at 41.7%','Schedule contact on all 30-day renewal concentration accounts','Digital mix below 20% — identify top 5 candidates for digital add-on','Weekly 1:1 coaching session Tuesday'],
+    'Karen Guirguis':['Strong improvement trend — maintain downward risk trajectory','Focus on 33 accounts due in 60 days — front-load conversations','Review 74 declined for save offer eligibility before Friday','Upsell opportunity in print-only segment — 28% digital mix'],
+    'April Dippolito':['URGENT: 51.2% risk exposure requires immediate intervention','Contact all declined accounts with save offer script this week','Escalate 5 highest-value declined to manager for joint call','Digital mix at 14.7% — critical gap, identify digital candidates'],
+    'Alex Polivka':['Excellent health score — leverage for team coaching session','18.9% risk is best on team — document methodology for replication','Push to Excellent tier: need 2.5 more health points','Focus on renewable pipeline to reach 180+ accounts']
+  };
+  const teamHealthScore=DEMO_HEALTH.reduce((s,r)=>s+r.healthScore,0)/6;
+  const mrr=BOB/12, arr=BOB, tcv=BOB;
+  const dMrr=DEC/12, dArr=DEC, dTcv=DEC;
+  return{
+    week:'Demo',weekDate:today+' (Demo Mode)',isWeek1:false,
+    dashboard:{
+      portfolioBaseline:BASE,currentFileTotal:BOB,wowDelta:-89090,wowDeltaPct:-0.25,
+      totalDeclined:DEC,riskPct:(DEC/BASE*100),digitalMix:26.4,digitalMrrMix:26.4,
+      healthScore:teamHealthScore,healthTier:healthTier(teamHealthScore),
+      exportFlag:'OK',healthModel:'4-Factor: Renew 40 / Payment 30 / Digital 20 / Engagement 10',
+      teamMrr:mrr,teamArr:arr,teamTcv:tcv,
+      declinedMrr:dMrr,declinedArr:dArr,declinedTcv:dTcv
+    },
+    health:DEMO_HEALTH,bandwidth:DEMO_BW,renewalConc:DEMO_CONC,
+    coachingActions:COACHING,
+    pastDueByRep:CS_REP_NAMES.reduce((o,n)=>{o[n]=[];return o;},{}),
+    flipPipeline:{stageCounts:{1:8,2:3,3:2,4:1},flipPublications:[],allPubs:[]},
+    segCounts:{declined:42,printOnly:31,renewable:187},
+    validations:[],
+    validationSummary:{overall_status:'REVIEW',passed:15,warned:3,failed:0,total:18},
+    declinePerformance:DEMO_HEALTH.map(r=>({
+      rep:r.rep,submissions:8,save_offer_rate:0.375,confirmed_revenue:42000,top_reason:'Price'
+    })),
+    declinePerformanceSummary:{total_submissions:48,match_rate:0.82,total_confirmed_revenue:252000},
+    cancellationPendingCount:7,
+    renewalLookup:{}
+  };
+}
+
+// ============================================================
+// PACK DOWNLOAD
+// ============================================================
+function buildPackText(){
+  const p=state.pack;
+  if(!p)return'No pack data.';
+  const d=p.dashboard;
+  const mc=state.manualContexts;
+  const lines=[];
+  lines.push('═══════════════════════════════════════════════════════════════════');
+  lines.push('  CSOPS GATEKEEPER — EXECUTIVE PACK');
+  lines.push('  Best Version Media · Client Success Operations');
+  lines.push(`  ${p.weekDate} · Generated ${new Date().toLocaleString()}`);
+  lines.push('═══════════════════════════════════════════════════════════════════');
+  lines.push('');
+  lines.push('PORTFOLIO TRUTH — RUN HANK LOCKED');
+  lines.push('───────────────────────────────────────────────────────────────────');
+  lines.push(`Portfolio Baseline:     ${fmt$(d.portfolioBaseline)}`);
+  lines.push(`Current File Total:     ${fmt$(d.currentFileTotal)}`);
+  lines.push(`WOW Delta:              ${p.isWeek1?'Week 1 — Baseline Established':fmt$(d.wowDelta)+' ('+fmtPct(d.wowDeltaPct)+')'}`);
+  lines.push(`Total Declined:         ${fmt$(d.totalDeclined)}`);
+  lines.push(`Portfolio Risk %:       ${fmtPct(d.riskPct)}`);
+  lines.push(`Digital Mix:            ${fmtPct(d.digitalMix)}`);
+  lines.push(`Health Score:           ${d.healthScore.toFixed(1)}  —  ${d.healthTier}`);
+  lines.push(`Export Integrity:       ${d.exportFlag}`);
+  lines.push(`Health Model:           ${d.healthModel}`);
+  lines.push('');
+  lines.push('REP BANDWIDTH — 500 ACCOUNT CEILING');
+  lines.push('───────────────────────────────────────────────────────────────────');
+  p.bandwidth.forEach(b=>{
+    lines.push(`${b.rep.padEnd(22)} Active: ${b.active}  Renewable: ${b.renewable}  Declined: ${b.declined}  Cancelled: ${b.cancelled}  ${b.over?'⚠ OVER CEILING':'OK'}`);
+  });
+  lines.push('');
+  lines.push('HEALTH SCORECARD');
+  lines.push('───────────────────────────────────────────────────────────────────');
+  p.health.forEach(r=>{
+    lines.push(`${r.rep.padEnd(22)} ${r.healthScore.toFixed(1)}  ${r.healthTier.padEnd(12)}  InScope ${fmt$(r.inScope)}  Declined ${fmt$(r.declinedRev)}  Risk ${fmtPct(r.riskPct)}  Digital ${fmtPct(r.digitalMix)}  Trend ${r.declineTrend}`);
+  });
+  lines.push('');
+  lines.push('COACHING DIRECTIVE — LOCKED FOR BRUNO EVALUATION NEXT WEEK');
+  lines.push('───────────────────────────────────────────────────────────────────');
+  CS_REP_NAMES.forEach(name=>{
+    const m=state.pack.health.find(h=>h.rep===name)||{};
+    const bw=state.pack.bandwidth.find(b=>b.rep===name)||{};
+    const actions=state.pack.coachingActions[name]||[];
+    lines.push(`${name.toUpperCase()}  ·  ${m.healthScore?.toFixed(1)} ${m.healthTier}  ·  Active ${bw.active}/${BANDWIDTH_CEILING}`);
+    actions.forEach((a,i)=>lines.push(`  ${i+1}. ${a}`));
+    const manual=mc[name];
+    if(manual&&manual.trim())lines.push(`  MANUAL CONTEXT: ${manual.trim()}`);
+    lines.push('');
+  });
+  lines.push('PENETRATION FIELDS — TO BE COMPLETED THIS WEEK');
+  lines.push('───────────────────────────────────────────────────────────────────');
+  lines.push('Dropdowns: Contacted [Yes/No] · Contact Type [Call/Email/Virtual Meeting/Text]');
+  lines.push('  Current Status [Active Conversation/No Response/Save Closed/Declined Confirmed/Escalated]');
+  lines.push('  Blocker [Price/Timing/Decision Maker/No Response/Competition/Other]');
+  lines.push('  Save Offer Outcome [Accepted/Rejected/Pending/No Offer Extended] · IDP Assigned [Yes/No]');
+  lines.push('  Free text: Next Step · Next Step Date · Outcome · Notes');
+  lines.push('');
+  lines.push('NOTE: Load this file as Previous Week Executive Pack (file 02) next Monday to unlock BRUNO.');
+  lines.push('');
+  // GRR Contest section
+  if(state.upsellLog.length>0){
+    lines.push('GRR CONTEST — UPSELL LOG');
+    lines.push('───────────────────────────────────────────────────────────────────');
+    state.upsellLog.forEach(u=>{
+      lines.push(`${u.date}  ${u.agreementNum.padEnd(14)} ${u.client.padEnd(30)} ${u.rep.padEnd(20)} ${fmt$(u.revenue)}  ${u.notes||''}`);
+    });
+    lines.push('');
+  }
+  lines.push('═══════════════════════════════════════════════════════════════════');
+  lines.push('  END OF EXECUTIVE PACK — DO NOT MODIFY ABOVE THIS LINE');
+  lines.push('═══════════════════════════════════════════════════════════════════');
+  return lines.join('\n');
+}
+
+async function triggerDownload(){
+  try{
+    const res=await fetch('/export_pack',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({pack:state.pack,segData:state.segData,manualContexts:state.manualContexts})
+    });
+    if(!res.ok){
+      const err=await res.json().catch(()=>({error:'Export failed'}));
+      throw new Error(err.error||'Export failed');
+    }
+    const blob=await res.blob();
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    const now=new Date();
+    const mm=String(now.getMonth()+1).padStart(2,'0');
+    const dd=String(now.getDate()).padStart(2,'0');
+    const yy=String(now.getFullYear()).slice(-2);
+    a.download=`Gatekeeper_ExecutivePack_${mm}${dd}${yy}.xlsx`;
+    document.body.appendChild(a);a.click();
+    setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},100);
+    state.dlDone=true;
+    render();
+  }catch(e){
+    alert('Export failed: '+e.message);
+  }
+}
+
+// ============================================================
+// BRUNO API CALL
+// ============================================================
+async function runBruno(){
+  state.brunoRunning=true;state.brunoError=null;state.brunoOutput=null;
+  render();startTimer();
+  try{
+    const p=state.pack;
+    const penetrationLogged=Object.values(state.segData).flat().filter(r=>r.contacted||r.statusField||r.outcome).length;
+    const prompt=`RUN BRUNO. ${p.weekDate}.
+
+PRIOR WEEK DIRECTIVE:
+${CS_REP_NAMES.map(name=>{const actions=p.coachingActions[name]||[];return`${name}: ${actions.join(' | ')}`}).join('\n')}
+
+PENETRATION DATA: ${penetrationLogged} accounts have data logged. ${penetrationLogged===0?'WARNING: No penetration fields populated. All evaluation metrics are ESTIMATED.':'Partial penetration data available.'}
+
+CURRENT HEALTH:
+${p.health.map(r=>`${r.rep}: ${r.healthScore.toFixed(1)} ${r.healthTier} | Risk ${fmtPct(r.riskPct)} | Digital ${fmtPct(r.digitalMix)} | Trend ${r.declineTrend}`).join('\n')}
+
+BANDWIDTH:
+${p.bandwidth.map(b=>`${b.rep}: ${b.active} active (${b.renewable} renewable / ${b.declined} declined)${b.over?' OVER CEILING':''}`).join('\n')}
+
+Evaluate coaching execution for all 6 reps. Flag inferred metrics as ESTIMATED where penetration fields are unpopulated. Return ONLY valid JSON no fences:
+{"executionAssessment":"3-4 sentences","repAccountability":[{"name":"rep name","finding":"1-2 sentences","estimatedMetrics":["list estimated metrics"],"actions":["Monday action 1","Monday action 2","Monday action 3"]}],"watchouts":["Watchout 1","Watchout 2"]}`;
+
+    const res=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:3000,system:CSOPS_SYSTEM,messages:[{role:'user',content:prompt}]})
+    });
+    const data=await res.json();
+    const raw=(data.content||[]).map(c=>c.text||'').join('').trim();
+    let parsed;
+    try{parsed=JSON.parse(raw.replace(/```json|```/g,'').trim());}
+    catch{parsed={executionAssessment:raw,repAccountability:[],watchouts:[]};}
+    state.brunoOutput=parsed;
+  }catch(e){state.brunoError='RUN BRUNO failed. Check connection and retry.';}
+  finally{state.brunoRunning=false;stopTimer();render();}
+}
+
+// ============================================================
+// HANK RUNNER
+// POSTs all 5 files to Flask /process, receives parsed row data,
+// then runs the processing engine on the returned JSON.
+// ============================================================
+async function runHank(){
+  state.hankRunning=true;state.hankError=null;state.hankStep=0;state.hankDone=false;state.dlDone=false;state.brunoOutput=null;
+  render();startTimer();
+  try{
+    // Build multipart form — field names match Flask REQUIRED_FILES
+    const fd=new FormData();
+    fd.append('renewal',state.files.renewal);
+    fd.append('execpack',state.files.execpack);
+    fd.append('pastdue',state.files.pastdue);
+    fd.append('gtp',state.files.gtp);
+    fd.append('cancellation',state.files.cancellation);
+
+    // Show step 0 (upload in progress) while waiting for server
+    state.hankStep=0;renderHankProgress();
+
+    const res=await fetch('/process',{method:'POST',body:fd});
+    if(!res.ok){
+      let msg='Server error '+res.status;
+      try{const j=await res.json();msg=j.error||(j.details?JSON.stringify(j.details):msg);}catch(_){}
+      throw new Error(msg);
+    }
+    const parsedData=await res.json();
+
+    await processHank(parsedData);
+    state.hankDone=true;
+    state.activeTab=0;
+  }catch(e){
+    console.error(e);
+    state.hankError='RUN HANK failed: '+e.message+'. Check files and retry.';
+  }finally{
+    state.hankRunning=false;stopTimer();render();
+  }
+}
+
+// ============================================================
+// SVG LOGO
+// ============================================================
+function bvmLogo(){
+  return`<svg width="42" height="42" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+    <rect x="4" y="4" width="88" height="88" fill="white" rx="3"/>
+    <rect x="4" y="108" width="88" height="88" fill="white" rx="3"/>
+    <rect x="108" y="108" width="88" height="88" fill="white" rx="3"/>
+    <text x="48" y="68" text-anchor="middle" fill="${NAVY}" font-size="62" font-weight="900" font-family="Arial Black,Arial">B</text>
+    <text x="48" y="172" text-anchor="middle" fill="${NAVY}" font-size="62" font-weight="900" font-family="Arial Black,Arial">V</text>
+    <text x="152" y="172" text-anchor="middle" fill="${NAVY}" font-size="62" font-weight="900" font-family="Arial Black,Arial">M</text>
+    <polygon points="108,4 196,4 196,92 152,58 108,92" fill="white"/>
+    <polygon points="120,16 184,16 184,76 152,52 120,76" fill="${NAVY}"/>
+  </svg>`;
+}
+
+// ============================================================
+// HTML BUILDERS
+// ============================================================
+const HANK_STEPS=[
+  'Uploading files — server parsing renewal report, past due, go to print, cancellation form...',
+  'Deduplicating on Agreement Number, establishing truth layer...',
+  'Loading Portfolio Baseline from prior Executive Pack...',
+  'Applying Digital Detection Rule across Sale Items...',
+  'Running segmentation priority: Declined › Print Only › Renewable...',
+  'Building top 20 lists per rep per category, ranked by dollar...',
+  'Matching cancellation form data to declined accounts by Agreement Number...',
+  'Computing Health Scores — 4-Factor Model (Renew 40 / Payment 30 / Digital 20 / Engagement 10)...',
+  'Calculating rep bandwidth vs 500 account ceiling...',
+  'Mapping renewal timing concentration — 30 / 60 / 90 day windows...',
+  'Processing Past Due signals into payment health layer...',
+  'Processing Go to Print — staging flip publishers by % to Baseline...',
+  'Generating coaching directives for all 6 reps...',
+  'Locking penetration fields and directive into Executive Pack...',
+  'Executive Pack ready.'
+];
+
+function renderHankProgress(){
+  const el=$('hank-progress');
+  if(!el)return;
+  el.innerHTML=HANK_STEPS.map((step,i)=>`
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;opacity:${i>state.hankStep?0.2:1};transition:opacity 0.3s;">
+      ${i<state.hankStep
+        ?`<div style="width:18px;height:18px;border-radius:50%;background:var(--success-bg);border:1.5px solid var(--success);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:9px;font-weight:700;color:var(--success);">✓</div>`
+        :i===state.hankStep
+        ?`<div style="width:14px;height:14px;border:2px solid #bfdbfe;border-top:2px solid var(--blue);border-radius:50%;animation:spin 0.8s linear infinite;flex-shrink:0;margin:2px;"></div>`
+        :`<div style="width:18px;height:18px;border-radius:50%;border:1.5px solid var(--border);flex-shrink:0;"></div>`}
+      <span style="font-size:12px;color:${i===state.hankStep?'var(--navy)':'var(--text-muted)'};font-weight:${i===state.hankStep?500:400};">${step}</span>
+    </div>
+  `).join('');
+}
+
+// ============================================================
+// MAIN RENDER
+// ============================================================
+function render(){
+  const app=$('app');
+  const p=state.pack;
+  const overCeiling=p?Object.values(p.bandwidth||{}).filter(b=>b.over):[];
+
+  app.innerHTML=`
+    ${renderHeader()}
+    <div style="max-width:1100px;margin:0 auto;padding:28px 24px;">
+      ${!state.hankDone?renderUpload():renderPack()}
+    </div>
+  `;
+  attachEventListeners();
+  if(state.hankRunning)renderHankProgress();
+  if(state.hankDone&&state.activeTab===0)setTimeout(()=>initRiskMap(state.pack&&state.pack.dashboard?state.pack.dashboard.riskPct||0:0),80);
+}
+
+function renderHeader(){
+  const p=state.pack;
+  const d=p?p.dashboard:null;
+  const vs=p?p.validationSummary||{}:{};
+  // Bloomberg ticker items — only when pack is loaded
+  const tickerItems=d?[
+    `<span class="ticker-mute">MRR</span>${fmt$(d.teamMrr)}`,
+    `<span class="ticker-mute">ARR</span>${fmt$(d.teamArr)}`,
+    `<span class="ticker-mute">TCV</span>${fmt$(d.teamTcv)}`,
+    `<span class="ticker-mute">DECLINED MRR</span><span class="ticker-neg">${fmt$(d.declinedMrr)}</span>`,
+    `<span class="ticker-mute">RISK</span><span class="ticker-neg">${fmtPct(d.riskPct)}</span>`,
+    `<span class="ticker-mute">DIGITAL MIX</span>${fmtPct(d.digitalMix)}`,
+    `<span class="ticker-mute">HEALTH</span>${d.healthScore.toFixed(1)} ${d.healthTier}`,
+    `<span class="ticker-mute">VALIDATION</span>${vs.overall_status||'—'} ${vs.passed||0}P ${vs.warned||0}W`,
+    `<span class="ticker-mute">BASELINE</span>${fmt$(d.portfolioBaseline)}`,
+    `<span class="ticker-mute">IN SCOPE</span><span class="${d.currentFileTotal>=d.portfolioBaseline*0.95?'ticker-pos':'ticker-neg'}">${fmt$(d.currentFileTotal)}</span>`,
+    `<span class="ticker-mute">WOW</span><span class="${d.wowDelta>=0?'ticker-pos':'ticker-neg'}">${p.isWeek1?'BASELINE SET':fmt$(d.wowDelta)}</span>`,
+  ]:[];
+  const tickerDup=tickerItems.length?[...tickerItems,...tickerItems]:[];
+
+  return`
+  <div style="background:linear-gradient(135deg,${NAVY_DARK} 0%,${NAVY} 55%,${NAVY_MID} 100%);box-shadow:0 2px 16px #00000035;">
+    <div style="max-width:1100px;margin:0 auto;padding:14px 24px;display:flex;justify-content:space-between;align-items:center;">
+      <div style="display:flex;align-items:center;gap:14px;">
+        <div style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.22);border-radius:10px;padding:7px;display:flex;align-items:center;justify-content:center;">${bvmLogo()}</div>
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
+            <span style="font-size:10px;font-weight:600;color:rgba(255,255,255,0.5);letter-spacing:0.16em;text-transform:uppercase;">Best Version Media</span>
+            <span style="color:rgba(255,255,255,0.2);">·</span>
+            <span style="font-size:10px;font-weight:600;color:rgba(255,255,255,0.5);letter-spacing:0.16em;text-transform:uppercase;">CSOps</span>
+          </div>
+          <div style="font-size:21px;font-weight:700;color:#fff;letter-spacing:-0.01em;line-height:1;">CSOps Gatekeeper</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-top:3px;">Monday Execution Console · Purple Rain X · v3.1</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        ${state.demoMode?`<div style="padding:5px 14px;border-radius:20px;background:rgba(217,119,6,0.3);border:1px solid rgba(217,119,6,0.6);font-size:10px;font-weight:700;color:#fcd34d;letter-spacing:0.1em;text-transform:uppercase;">DEMO MODE</div>`:''}
+        ${[{l:'RUN HANK',a:state.hankDone},{l:'RUN BRUNO',a:!!state.brunoOutput}].map(s=>`
+          <div style="padding:5px 14px;border-radius:20px;background:${s.a?'rgba(255,255,255,0.18)':'rgba(255,255,255,0.07)'};border:1px solid ${s.a?'rgba(255,255,255,0.35)':'rgba(255,255,255,0.12)'};font-size:10px;font-weight:600;color:${s.a?'#fff':'rgba(255,255,255,0.3)'};letter-spacing:0.1em;text-transform:uppercase;">${s.a?'&#10003; ':''}${s.l}</div>
+        `).join('')}
+      </div>
+    </div>
+  </div>
+  ${tickerDup.length?`
+  <div class="ticker-wrap">
+    <div class="ticker-inner">
+      ${tickerDup.map(item=>`<div class="ticker-item">${item}</div>`).join('')}
+    </div>
+  </div>`:''}`;
+}
+
+const FILE_SLOTS=[
+  {id:'renewal',n:'01',label:'Current Week Raw Renewal Report',desc:'Live exposure data. Establishes portfolio truth for the week.',accept:'.xlsx,.csv'},
+  {id:'execpack',n:'02',label:'Previous Week Gatekeeper Executive Pack',desc:'Carries Portfolio Baseline forward. Required for WOW delta and BRUNO evaluation.',accept:'.txt'},
+  {id:'pastdue',n:'03',label:'Past Due Report',desc:'Payment health signals — aging buckets, legal flags, past due reasons.',accept:'.xlsx,.csv'},
+  {id:'gtp',n:'04',label:'Go to Print',desc:'Flip intelligence layer. Stages publishers by % to Baseline.',accept:'.xlsx,.csv'},
+  {id:'cancellation',n:'05',label:'Cancellation / Decline Form Export',desc:'Backend form submissions. Matches to declined accounts by Agreement Number.',accept:'.xlsx,.csv'}
+];
+
+function renderUpload(){
+  const allLoaded=FILE_SLOTS.every(s=>state.files[s.id]);
+  return`
+    <div class="fade">
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:20px;box-shadow:0 1px 4px #0000000a;">
+        <div class="sl"><span>Step 1 — Load Monday Files · All 5 Required</span></div>
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:18px;line-height:1.6;padding-left:11px;">Upload all five files. Drag and drop or click each slot. RUN HANK activates once all five are loaded.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+          ${FILE_SLOTS.map(slot=>{
+            const loaded=!!state.files[slot.id];
+            return`
+            <div class="slot" id="slot-${slot.id}" style="background:${loaded?NAVY_PALE:'var(--card-alt)'};border:1.5px ${loaded?'solid':'dashed'} ${loaded?NAVY:'var(--border-mid)'};border-radius:8px;padding:14px 16px;" onclick="document.getElementById('file-${slot.id}').click()">
+              <input id="file-${slot.id}" type="file" accept="${slot.accept}" style="display:none;" onchange="handleFileInput('${slot.id}',this)"/>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:${loaded?NAVY:'var(--text-light)'};">${slot.n}</span>
+                <span class="pill" style="color:${loaded?'var(--success)':'var(--text-light)'};background:${loaded?'var(--success-bg)':'var(--card)'};border-color:${loaded?'var(--success-border)':'var(--border)'};">${loaded?'Loaded':'Pending'}</span>
+              </div>
+              <div style="font-size:12px;font-weight:600;color:${loaded?NAVY:'var(--text-mid)'};margin-bottom:5px;line-height:1.4;">${slot.label}</div>
+              <div style="font-size:11px;color:${loaded?'#3d5580':'var(--text-muted)'};line-height:1.5;">${loaded?'✓  '+state.files[slot.id].name:slot.desc}</div>
+            </div>`;
+          }).join('')}
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding-top:14px;border-top:1px solid var(--border);">
+          ${FILE_SLOTS.map((s,i)=>`
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="width:9px;height:9px;border-radius:50%;background:${state.files[s.id]?'var(--success)':'var(--border-mid)'};transition:background 0.3s;box-shadow:${state.files[s.id]?'0 0 0 3px var(--success-bg)':'none'};"></div>
+              ${i<FILE_SLOTS.length-1?`<div style="width:28px;height:1.5px;background:${state.files[s.id]?'#16a34a44':'var(--border)'};border-radius:1px;"></div>`:''}
+            </div>
+          `).join('')}
+          <span style="font-size:11px;color:var(--text-muted);margin-left:8px;">${Object.keys(state.files).length} of 5 files loaded</span>
+        </div>
+      </div>
+
+      ${state.hankRunning?`
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px 24px;margin-bottom:16px;box-shadow:0 1px 4px #0000000a;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+            <div style="width:14px;height:14px;border:2px solid #bfdbfe;border-top:2px solid var(--blue);border-radius:50%;animation:spin 0.8s linear infinite;flex-shrink:0;"></div>
+            <div>
+              <div style="font-size:13px;font-weight:600;color:${NAVY};">RUN HANK Executing</div>
+              <div style="font-size:11px;color:var(--text-muted);"><span id="timer-display">0s</span> elapsed</div>
+            </div>
+          </div>
+          <div id="hank-progress"></div>
+        </div>
+      `:''}
+
+      ${state.hankError?`<div style="background:var(--danger-bg);border:1px solid var(--danger-border);border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:12px;color:var(--danger);">${state.hankError}</div>`:''}
+
+      <div style="display:grid;grid-template-columns:1fr auto;gap:10px;">
+        <button onclick="runHank()" ${!allLoaded||state.hankRunning?'disabled':''} style="padding:14px;border-radius:8px;border:none;background:${allLoaded&&!state.hankRunning?`linear-gradient(135deg,${NAVY_DARK},${NAVY_MID})`:'#e2e8f0'};color:${allLoaded&&!state.hankRunning?'#fff':'var(--text-light)'};font-size:13px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;cursor:${allLoaded&&!state.hankRunning?'pointer':'not-allowed'};display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:${allLoaded&&!state.hankRunning?'0 2px 8px #24345440':'none'};transition:all 0.2s;font-family:'Inter',system-ui,sans-serif;">
+          ${state.hankRunning?`<div style="width:13px;height:13px;border:2px solid #bfdbfe;border-top:2px solid var(--blue);border-radius:50%;animation:spin 0.8s linear infinite;"></div> RUN HANK Executing...`:'&#9654;  RUN HANK'}
+        </button>
+        <button onclick="runDemo()" style="padding:14px 20px;border-radius:8px;border:1.5px solid #d97706;background:#fffbeb;color:#92400e;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;font-family:'Inter',system-ui,sans-serif;white-space:nowrap;" title="Load mock placeholder data to preview all tabs">
+          DEMO MODE
+        </button>
+      </div>
+    </div>`;
+}
+
+function renderPack(){
+  const p=state.pack;
+  const overCeiling=p.bandwidth.filter(b=>b.over);
+  const vs=p.validationSummary||{};
+  const valBadgeColor=vs.overall_status==='CRITICAL'?'var(--danger)':vs.overall_status==='REVIEW'?'var(--warning)':'var(--success)';
+  const valBadgeBg=vs.overall_status==='CRITICAL'?'var(--danger-bg)':vs.overall_status==='REVIEW'?'var(--warning-bg)':'var(--success-bg)';
+  const valBadgeBorder=vs.overall_status==='CRITICAL'?'var(--danger-border)':vs.overall_status==='REVIEW'?'var(--warning-border)':'var(--success-border)';
+  const TABS=['Dashboard','Leadership','Bi-Weekly','Segmentation','Health Scorecard','Coaching','Flip Pipeline','Decline Performance','Contest Tracker','Validation'];
+
+  return`
+    <div class="fade">
+      ${overCeiling.length>0?`
+        <div style="background:var(--danger-bg);border:1.5px solid var(--danger-border);border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px;">
+          <span style="font-size:16px;">⚠️</span>
+          <span style="font-size:12px;font-weight:600;color:var(--danger);">Active Account Ceiling Breach — ${overCeiling.map(b=>`${b.rep.split(' ')[0]} ${b.rep.split(' ')[1]} (${b.active} active · ${b.active-BANDWIDTH_CEILING} over)`).join(' · ')}</span>
+        </div>
+      `:''}
+
+      ${p.isWeek1?`
+        <div style="background:var(--blue-bg);border:1px solid var(--blue-border);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:12px;color:var(--blue);font-weight:500;">
+          Week 1 Run — Portfolio Baseline established from current file. WOW Delta and Decline Trend will activate from Week 2 onward. Download this pack and load as file 02 next Monday.
+        </div>
+      `:''}
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+            <div style="width:8px;height:8px;border-radius:50%;background:var(--success);"></div>
+            <span style="font-size:11px;font-weight:600;color:var(--success);letter-spacing:0.1em;text-transform:uppercase;">RUN HANK Complete · Executive Pack Ready</span>
+          </div>
+          <div style="font-size:20px;font-weight:700;color:${NAVY};">Gatekeeper Executive Pack</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${p.weekDate} · Portfolio Baseline ${fmt$(p.dashboard.portfolioBaseline)} · ${p.isWeek1?'Baseline Established':'WOW Active'}</div>
+        </div>
+      </div>
+
+      <!-- POST-HANK PROMPT -->
+      <div style="background:${NAVY_PALE};border:1.5px solid ${NAVY}33;border-radius:12px;padding:20px 24px;margin-bottom:20px;">
+        <div style="font-size:11px;font-weight:700;color:${NAVY};letter-spacing:0.1em;text-transform:uppercase;margin-bottom:16px;">What would you like to do?</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+          <button onclick="triggerDownload()" style="padding:16px;border-radius:8px;border:1.5px solid ${state.dlDone?'var(--success-border)':NAVY};background:${state.dlDone?'var(--success-bg)':'var(--card)'};cursor:pointer;text-align:left;transition:all 0.2s;font-family:'Inter',system-ui,sans-serif;">
+            <div style="font-size:18px;margin-bottom:8px;">${state.dlDone?'✓':'↓'}</div>
+            <div style="font-size:13px;font-weight:700;color:${state.dlDone?'var(--success)':NAVY};margin-bottom:4px;">${state.dlDone?'Pack Downloaded':'Download Executive Pack'}</div>
+            <div style="font-size:11px;color:var(--text-muted);line-height:1.5;">Exports full pack with coaching directive and penetration fields locked. Load as file 02 next Monday to unlock BRUNO.</div>
+          </button>
+          <button onclick="toggleBruno()" style="padding:16px;border-radius:8px;border:1.5px solid ${state.brunoOutput?'var(--success-border)':'var(--blue-border)'};background:${state.brunoOutput?'var(--success-bg)':'var(--blue-bg)'};cursor:pointer;text-align:left;transition:all 0.2s;font-family:'Inter',system-ui,sans-serif;">
+            <div style="font-size:18px;margin-bottom:8px;">${state.brunoOutput?'✓':'▶'}</div>
+            <div style="font-size:13px;font-weight:700;color:${state.brunoOutput?'var(--success)':'var(--blue)'};margin-bottom:4px;">${state.brunoOutput?'BRUNO Complete':'Run BRUNO'}</div>
+            <div style="font-size:11px;color:var(--text-muted);line-height:1.5;">Optional. Evaluates penetration fields against last week's directive. Reads file 02 already loaded.</div>
+          </button>
+          <button onclick="resetAll()" style="padding:16px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);cursor:pointer;text-align:left;transition:all 0.2s;font-family:'Inter',system-ui,sans-serif;">
+            <div style="font-size:18px;margin-bottom:8px;">←</div>
+            <div style="font-size:13px;font-weight:700;color:var(--text-mid);margin-bottom:4px;">Reset</div>
+            <div style="font-size:11px;color:var(--text-muted);line-height:1.5;">Clear all files and outputs. Start a new run with fresh data.</div>
+          </button>
+        </div>
+      </div>
+
+      ${state.brunoOpen?renderBrunoPanel():''}
+
+      <!-- MAIN TABS -->
+      <div style="background:var(--card);border-radius:12px;border:1px solid var(--border);overflow:hidden;box-shadow:0 1px 4px #0000000a;">
+        <div style="display:flex;border-bottom:1px solid var(--border);overflow-x:auto;">
+          ${TABS.map((t,i)=>`
+            <button class="tab-btn" onclick="setTab(${i})" style="flex-shrink:0;border-bottom:2.5px solid ${state.activeTab===i?NAVY:'transparent'};color:${state.activeTab===i?NAVY:'var(--text-muted)'};font-size:11px;font-weight:${state.activeTab===i?600:400};padding:12px 16px;letter-spacing:0.02em;">
+              ${t}
+              ${i===0?`<span style="margin-left:5px;font-size:9px;font-weight:700;color:var(--blue);background:var(--blue-bg);border:1px solid var(--blue-border);border-radius:10px;padding:1px 5px;">LIVE</span>`:''}
+              ${i===9?`<span style="margin-left:5px;font-size:9px;font-weight:700;color:${valBadgeColor};background:${valBadgeBg};border:1px solid ${valBadgeBorder};border-radius:10px;padding:1px 5px;">${vs.overall_status||'—'}</span>`:''}
+            </button>
+          `).join('')}
+        </div>
+        <div style="padding:20px 24px;">
+          ${state.activeTab===0?renderDashboard():
+            state.activeTab===1?renderLeadershipView():
+            state.activeTab===2?renderBiWeekly():
+            state.activeTab===3?renderSegmentation():
+            state.activeTab===4?renderHealthScorecard():
+            state.activeTab===5?renderCoaching():
+            state.activeTab===6?renderFlipPipeline():
+            state.activeTab===7?renderDeclinePerformance():
+            state.activeTab===8?renderContestTracker():
+            renderValidation()}
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderLeadershipView(){
+  const p=state.pack;
+  return`
+    <div class="fade">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);margin-bottom:16px;padding:8px 12px;background:var(--card-alt);border-radius:6px;border:1px solid var(--border);">
+        Leadership Trajectory View · ${p.weekDate} · Health direction · Bandwidth · Renewal pressure · Attrition patterns
+      </div>
+
+      <div class="sl"><span>Rep Bandwidth — ${BANDWIDTH_CEILING} Account Ceiling · Renewable + Declined − Cancelled</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:20px;">
+        ${p.bandwidth.map(b=>{
+          const pct=Math.min((b.active/BANDWIDTH_CEILING)*100,120);
+          return`
+          <div style="background:${b.over?'var(--danger-bg)':'var(--card)'};border:1.5px solid ${b.over?'var(--danger-border)':'var(--border)'};border-radius:8px;padding:14px 16px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+              <div style="font-size:12px;font-weight:700;color:${NAVY};">${b.rep}</div>
+              <span class="pill" style="color:${b.over?'var(--danger)':'var(--success)'};background:${b.over?'var(--danger-bg)':'var(--success-bg)'};border-color:${b.over?'var(--danger-border)':'var(--success-border)'};">${b.over?'Over':'OK'}</span>
+            </div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;color:${b.over?'var(--danger)':NAVY};line-height:1;margin-bottom:4px;">${b.active}</div>
+            <div style="height:4px;background:var(--border);border-radius:2px;margin-bottom:8px;overflow:hidden;">
+              <div style="height:100%;width:${pct}%;background:${b.over?`linear-gradient(90deg,var(--warning),var(--danger))`:`linear-gradient(90deg,${NAVY_PALE},${NAVY})`};border-radius:2px;transition:width 0.6s ease;"></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;">
+              ${[['Renewable',b.renewable,'var(--success)'],['Declined',b.declined,'var(--danger)'],['Cancelled',b.cancelled,'var(--text-muted)']].map(([l,v,col])=>`
+                <div style="text-align:center;">
+                  <div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px;">${l}</div>
+                  <div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:${col};">${v}</div>
+                </div>
+              `).join('')}
+            </div>
+            <div style="font-size:10px;color:${b.over?'var(--danger)':'var(--text-muted)'};font-family:'JetBrains Mono',monospace;margin-top:6px;">${b.active}/${BANDWIDTH_CEILING} ceiling${b.over?` · ${b.active-BANDWIDTH_CEILING} over`:''}</div>
+          </div>`;
+        }).join('')}
+      </div>
+
+      <div class="sl"><span>Renewal Timing Concentration — 30 / 60 / 90 Day Windows</span></div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:20px;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead><tr style="background:${NAVY_PALE};">${['Rep','Due 30 Days','Due 60 Days','Due 90 Days','Highest Account'].map(h=>`<th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:600;color:${NAVY};letter-spacing:0.06em;">${h}</th>`).join('')}</tr></thead>
+          <tbody>
+            ${p.renewalConc.map((r,i)=>`
+              <tr style="border-top:1px solid var(--border);background:${i%2===0?'var(--card)':'var(--card-alt)'};">
+                <td style="padding:11px 14px;font-size:12px;font-weight:600;color:${NAVY};">${r.rep}</td>
+                <td style="padding:11px 14px;"><span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:${r.next30>40?'var(--danger)':r.next30>25?'var(--warning)':'var(--success)'};">${r.next30}</span></td>
+                <td style="padding:11px 14px;"><span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:${r.next60>80?'var(--danger)':r.next60>50?'var(--warning)':'var(--text-mid)'};">${r.next60}</span></td>
+                <td style="padding:11px 14px;"><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-mid);">${r.next90}</span></td>
+                <td style="padding:11px 14px;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:${NAVY};">${fmt$(r.highestDollar)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="sl"><span>Health Direction — Score · Tier · Risk · Digital · Trend</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:20px;">
+        ${p.health.map(r=>`
+          <div style="background:${tierBg(r.healthTier)};border:1px solid ${tierColor(r.healthTier)}22;border-radius:8px;padding:12px 14px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <div style="font-size:12px;font-weight:700;color:${NAVY};">${r.rep}</div>
+              <span class="pill" style="color:${tierColor(r.healthTier)};background:white;border-color:${tierColor(r.healthTier)}44;">${r.healthTier}</span>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px;">
+              <span style="font-family:'JetBrains Mono',monospace;font-size:28px;font-weight:700;color:${tierColor(r.healthTier)};">${r.healthScore.toFixed(1)}</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:${r.declineTrend==='▲'?'var(--danger)':r.declineTrend==='▼'?'var(--success)':'var(--text-muted)'};">${r.declineTrend}</span>
+            </div>
+            <div style="display:flex;gap:12px;">
+              <div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;">Risk</div><div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:${r.riskPct>45?'var(--danger)':'var(--warning)'};">${fmtPct(r.riskPct)}</div></div>
+              <div><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;">Digital</div><div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:${r.digitalMix<20?'var(--danger)':r.digitalMix<30?'var(--warning)':'var(--success)'};">${fmtPct(r.digitalMix)}</div></div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+
+      <div class="sl"><span>Past Due Summary by Rep</span></div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:20px;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead><tr style="background:${NAVY_PALE};">${['Rep','Accounts','Total Due','0-30','31-60','61-90','90+','Legal Flags'].map(h=>`<th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:600;color:${NAVY};letter-spacing:0.06em;">${h}</th>`).join('')}</tr></thead>
+          <tbody>
+            ${CS_REP_NAMES.map((name,i)=>{
+              const pd=p.pastDueByRep[name]||[];
+              const totalDue=pd.reduce((s,r)=>s+r.totalDue,0);
+              const d0_30=pd.reduce((s,r)=>s+r.d0_30,0);
+              const d31_60=pd.reduce((s,r)=>s+r.d31_60,0);
+              const d61_90=pd.reduce((s,r)=>s+r.d61_90,0);
+              const d90plus=pd.reduce((s,r)=>s+r.d91_120+r.d121_150+r.d150plus,0);
+              const legalCount=pd.filter(r=>r.legal).length;
+              return`
+              <tr style="border-top:1px solid var(--border);background:${i%2===0?'var(--card)':'var(--card-alt)'};">
+                <td style="padding:11px 14px;font-size:12px;font-weight:600;color:${NAVY};">${name}</td>
+                <td style="padding:11px 14px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-mid);">${pd.length}</td>
+                <td style="padding:11px 14px;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:${totalDue>5000?'var(--danger)':'var(--text-mid)'};">${fmt$(totalDue)}</td>
+                <td style="padding:11px 14px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted);">${fmt$(d0_30)}</td>
+                <td style="padding:11px 14px;font-family:'JetBrains Mono',monospace;font-size:11px;color:${d31_60>0?'var(--warning)':'var(--text-muted)'};">${fmt$(d31_60)}</td>
+                <td style="padding:11px 14px;font-family:'JetBrains Mono',monospace;font-size:11px;color:${d61_90>0?'var(--danger)':'var(--text-muted)'};">${fmt$(d61_90)}</td>
+                <td style="padding:11px 14px;font-family:'JetBrains Mono',monospace;font-size:11px;color:${d90plus>0?'var(--danger)':'var(--text-muted)'};">${fmt$(d90plus)}</td>
+                <td style="padding:11px 14px;">${legalCount>0?`<span class="pill" style="color:var(--danger);background:var(--danger-bg);border-color:var(--danger-border);">${legalCount} Legal</span>`:'<span style="font-size:11px;color:var(--text-muted);">—</span>'}</td>
+              </tr>`;
+            }).join('')}
+            ${(()=>{
+              const all=CS_REP_NAMES.flatMap(n=>p.pastDueByRep[n]||[]);
+              const tAccts=all.length;
+              const tDue=all.reduce((s,r)=>s+r.totalDue,0);
+              const t030=all.reduce((s,r)=>s+r.d0_30,0);
+              const t3160=all.reduce((s,r)=>s+r.d31_60,0);
+              const t6190=all.reduce((s,r)=>s+r.d61_90,0);
+              const t90p=all.reduce((s,r)=>s+r.d91_120+r.d121_150+r.d150plus,0);
+              const tLegal=all.filter(r=>r.legal).length;
+              const tdS=`padding:11px 14px;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:#fff;`;
+              return`<tr style="border-top:2px solid ${NAVY};background:${NAVY};">
+                <td style="padding:11px 14px;font-size:12px;font-weight:700;color:#fff;letter-spacing:0.06em;text-transform:uppercase;">TOTALS</td>
+                <td style="${tdS}">${tAccts}</td>
+                <td style="${tdS}">${fmt$(tDue)}</td>
+                <td style="${tdS}">${fmt$(t030)}</td>
+                <td style="${tdS}">${fmt$(t3160)}</td>
+                <td style="${tdS}">${fmt$(t6190)}</td>
+                <td style="${tdS}">${fmt$(t90p)}</td>
+                <td style="${tdS}">${tLegal>0?tLegal+' Legal':'—'}</td>
+              </tr>`;
+            })()}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function renderDashboard_LEGACY(){
+  const d=state.pack.dashboard;
+  const wowPos=d.wowDelta>=0;
+  const vs=state.pack.validationSummary||{};
+  const vsColor=vs.overall_status==='CRITICAL'?'var(--danger)':vs.overall_status==='REVIEW'?'var(--warning)':'var(--success)';
+  const vsBg=vs.overall_status==='CRITICAL'?'var(--danger-bg)':vs.overall_status==='REVIEW'?'var(--warning-bg)':'var(--success-bg)';
+  const vsBorder=vs.overall_status==='CRITICAL'?'var(--danger-border)':vs.overall_status==='REVIEW'?'var(--warning-border)':'var(--success-border)';
+  const baselinePct=d.portfolioBaseline>0?(d.currentFileTotal/d.portfolioBaseline*100):0;
+  const bobColor=baselinePct>=95?'var(--success)':baselinePct>=80?'var(--warning)':'var(--danger)';
+
+  // Revenue helpers
+  const mrr=d.teamMrr||0, arr=d.teamArr||0, tcv=d.teamTcv||0;
+  const dMrr=d.declinedMrr||0, dArr=d.declinedArr||0, dTcv=d.declinedTcv||0;
+  const mrrRisk=mrr>0?(dMrr/mrr*100):0;
+  const arrRisk=arr>0?(dArr/arr*100):0;
+  const tcvRisk=tcv>0?(dTcv/tcv*100):0;
+
+  // Shared style helpers
+  const PC=(bg,bdr)=>`background:${bg};border:1.5px solid ${bdr};border-radius:12px;padding:20px 22px;`;
+  const LABEL=(col='var(--text-muted)')=>`font-size:9px;font-weight:700;color:${col};letter-spacing:0.14em;text-transform:uppercase;margin-bottom:8px;`;
+  const BIG=(col)=>`font-family:'JetBrains Mono',monospace;font-size:32px;font-weight:700;color:${col};line-height:1;margin-bottom:6px;`;
+  const SUB=`font-size:10px;color:var(--text-muted);`;
+
+  return`
+    <div class="fade">
+
+      <!-- ── Header bar ─────────────────────────────────────── -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);padding:7px 12px;background:var(--card-alt);border-radius:6px;border:1px solid var(--border);flex:1;margin-right:10px;">${state.pack.weekDate} · ${d.healthModel}</div>
+        <div onclick="setTab(9)" style="cursor:pointer;padding:7px 14px;border-radius:6px;background:${vsBg};border:1px solid ${vsBorder};display:flex;align-items:center;gap:8px;flex-shrink:0;">
+          <div style="width:7px;height:7px;border-radius:50%;background:${vsColor};flex-shrink:0;"></div>
+          <span style="font-size:10px;font-weight:700;color:${vsColor};letter-spacing:0.1em;text-transform:uppercase;">${vs.overall_status||'—'}</span>
+          <span style="font-size:10px;color:var(--text-muted);">${vs.passed||0}P · ${vs.warned||0}W · ${vs.failed||0}F</span>
+          <span style="font-size:10px;color:var(--text-muted);margin-left:2px;">→ Validation</span>
+        </div>
+      </div>
+
+      <!-- ── SECTION LABEL ──────────────────────────────────── -->
+      <div style="font-size:9px;font-weight:700;color:${NAVY};letter-spacing:0.14em;text-transform:uppercase;margin-bottom:10px;padding-left:2px;">Revenue Overview</div>
+
+      <!-- ── REVENUE HERO — MRR · ARR · TCV ────────────────── -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:4px;">
+
+        <!-- MRR -->
+        <div style="${PC(NAVY,'transparent')}">
+          <div style="${LABEL('rgba(255,255,255,0.55)')}">MRR</div>
+          <div style="${BIG('#fff')}">${fmt$(mrr)}</div>
+          <div style="height:1px;background:rgba(255,255,255,0.12);margin:10px 0;"></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="font-size:10px;color:rgba(255,255,255,0.45);">Declined Exposure</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:#fca5a5;">${fmt$(dMrr)}<span style="font-size:9px;font-weight:400;margin-left:4px;color:rgba(255,255,255,0.4);">${fmtPct(mrrRisk)}</span></div>
+          </div>
+        </div>
+
+        <!-- ARR -->
+        <div style="${PC('var(--card)',`${NAVY}44`)}">
+          <div style="${LABEL()}">ARR</div>
+          <div style="${BIG(NAVY)}">${fmt$(arr)}</div>
+          <div style="height:1px;background:var(--border);margin:10px 0;"></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="${SUB}">Declined Exposure</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--danger);">${fmt$(dArr)}<span style="font-size:9px;font-weight:400;color:var(--text-muted);margin-left:4px;">${fmtPct(arrRisk)}</span></div>
+          </div>
+        </div>
+
+        <!-- TCV -->
+        <div style="${PC('var(--card)',`${NAVY}44`)}">
+          <div style="${LABEL()}">TCV</div>
+          <div style="${BIG(NAVY)}">${fmt$(tcv)}</div>
+          <div style="height:1px;background:var(--border);margin:10px 0;"></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="${SUB}">Declined Exposure</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--danger);">${fmt$(dTcv)}<span style="font-size:9px;font-weight:400;color:var(--text-muted);margin-left:4px;">${fmtPct(tcvRisk)}</span></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ── Digital Mix note below revenue row ──────────────── -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;">
+        <div style="padding:6px 10px;background:rgba(124,58,237,0.06);border-radius:0 0 8px 8px;border:1px solid rgba(124,58,237,0.15);border-top:none;display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:9px;color:var(--purple);font-weight:600;letter-spacing:0.06em;">Digital Mix · MRR Basis</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:var(--purple);">${fmtPct(d.digitalMrrMix)}</span>
+        </div>
+        <div style="padding:6px 10px;background:rgba(124,58,237,0.06);border-radius:0 0 8px 8px;border:1px solid rgba(124,58,237,0.15);border-top:none;display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:9px;color:var(--purple);font-weight:600;letter-spacing:0.06em;">Digital Mix · ARR Basis</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:var(--purple);">${fmtPct(d.digitalMrrMix)}</span>
+        </div>
+        <div style="padding:6px 10px;background:rgba(124,58,237,0.06);border-radius:0 0 8px 8px;border:1px solid rgba(124,58,237,0.15);border-top:none;display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:9px;color:var(--purple);font-weight:600;letter-spacing:0.06em;">Digital Mix · TCV Basis</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:var(--purple);">${fmtPct(d.digitalMix)}</span>
+        </div>
+      </div>
+
+      <!-- ── SECTION LABEL ──────────────────────────────────── -->
+      <div style="font-size:9px;font-weight:700;color:${NAVY};letter-spacing:0.14em;text-transform:uppercase;margin-bottom:10px;padding-left:2px;">Portfolio & Health</div>
+
+      <!-- ── PORTFOLIO 2×2 ───────────────────────────────────── -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+
+        <!-- Portfolio Baseline -->
+        <div style="${PC('var(--card-alt)',`${NAVY}22`)}">
+          <div style="${LABEL()}">Portfolio Baseline</div>
+          <div style="${BIG(NAVY)}">${fmt$(d.portfolioBaseline)}</div>
+          <div style="${SUB}">Static Truth · Locked · Never Derived from File</div>
+        </div>
+
+        <!-- In Scope BoB -->
+        <div style="${PC('var(--card)',`${NAVY}33`)}">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+            <div style="${LABEL()}">In Scope BoB</div>
+            <span style="font-size:9px;font-weight:700;color:${bobColor};background:${baselinePct>=95?'var(--success-bg)':baselinePct>=80?'var(--warning-bg)':'var(--danger-bg)'};border:1px solid ${baselinePct>=95?'var(--success-border)':baselinePct>=80?'var(--warning-border)':'var(--danger-border)'};border-radius:4px;padding:2px 7px;">${fmtPct(baselinePct)}</span>
+          </div>
+          <div style="${BIG(NAVY)}">${fmt$(d.currentFileTotal)}</div>
+          <div style="height:3px;background:var(--border);border-radius:2px;overflow:hidden;">
+            <div style="height:100%;width:${Math.min(baselinePct,100).toFixed(1)}%;background:${bobColor};border-radius:2px;transition:width 0.6s ease;"></div>
+          </div>
+        </div>
+
+        <!-- Total Declined (TCV) -->
+        <div style="${PC('var(--danger-bg)','var(--danger-border)')}">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+            <div style="${LABEL('var(--danger)')}opacity:0.75;">Total Declined · TCV</div>
+            <span style="font-size:9px;font-weight:700;color:var(--danger);background:white;border:1px solid var(--danger-border);border-radius:4px;padding:2px 7px;">${fmtPct(d.riskPct)} Risk</span>
+          </div>
+          <div style="${BIG('var(--danger)')}">${fmt$(d.totalDeclined)}</div>
+          <div style="font-size:10px;color:var(--danger);opacity:0.7;">MRR Exposure ${fmt$(dMrr)} · ARR ${fmt$(dArr)}</div>
+        </div>
+
+        <!-- Team Health Score -->
+        <div style="${PC(tierBg(d.healthTier),`${tierColor(d.healthTier)}44`)}">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+            <div style="${LABEL()}">Team Health Score</div>
+            <span class="pill" style="color:${tierColor(d.healthTier)};background:white;border-color:${tierColor(d.healthTier)}44;">${d.healthTier}</span>
+          </div>
+          <div style="${BIG(tierColor(d.healthTier))}">${d.healthScore.toFixed(1)}<span style="font-size:15px;font-weight:400;color:var(--text-muted);margin-left:4px;">/ 100</span></div>
+          <div style="${SUB}">4-Factor · Renew 40 / Payment 30 / Digital 20 / Engagement 10</div>
+        </div>
+
+      </div>
+
+      <!-- ── OPERATIONS ROW ──────────────────────────────────── -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;">
+
+        <div class="mcard" style="background:${state.pack.isWeek1?'var(--card)':wowPos?'var(--blue-bg)':'var(--danger-bg)'};border-color:${state.pack.isWeek1?'var(--border)':wowPos?'var(--blue-border)':'var(--danger-border)'};">
+          <div class="label">WOW Delta</div>
+          <div class="value" style="color:${state.pack.isWeek1?'var(--text-muted)':wowPos?'var(--blue)':'var(--danger)'};">${state.pack.isWeek1?'—':fmt$(d.wowDelta)}</div>
+          <div class="sub">${state.pack.isWeek1?'Week 1 — Baseline Established':fmtPct(d.wowDeltaPct)+' WOW'}</div>
+        </div>
+
+        <div class="mcard" style="background:var(--danger-bg);border-color:var(--danger-border);">
+          <div class="label">Portfolio Risk %</div>
+          <div class="value" style="color:var(--danger);">${fmtPct(d.riskPct)}</div>
+          <div class="sub">Declined TCV ÷ Baseline</div>
+        </div>
+
+        <div class="mcard" style="background:var(--purple-bg);border-color:var(--purple-border);">
+          <div class="label">Digital Mix · TCV</div>
+          <div class="value" style="color:var(--purple);">${fmtPct(d.digitalMix)}</div>
+          <div class="sub">${d.digitalMix<30?'Below 30% Band':'Above Target'} · MRR ${fmtPct(d.digitalMrrMix)}</div>
+        </div>
+
+        <div class="mcard" style="background:${d.exportFlag==='OK'?'var(--success-bg)':'var(--danger-bg)'};border-color:${d.exportFlag==='OK'?'var(--success-border)':'var(--danger-border)'};">
+          <div class="label">Export Integrity</div>
+          <div class="value" style="color:${d.exportFlag==='OK'?'var(--success)':'var(--danger)'};">${d.exportFlag}</div>
+          <div class="sub">${d.exportFlag==='OK'?'Full coverage confirmed':'⚠ Coverage gap'}</div>
+        </div>
+
+      </div>
+
+      <!-- ── LEGEND ──────────────────────────────────────────── -->
+      <div style="background:var(--card-alt);border:1px solid var(--border);border-radius:10px;padding:16px 20px;">
+        <div style="font-size:9px;font-weight:700;color:${NAVY};letter-spacing:0.14em;text-transform:uppercase;margin-bottom:12px;">Metric Definitions</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
+          ${[
+            ['MRR','Monthly Recurring Revenue','What the team collects every month right now. The heartbeat of the business.'],
+            ['ARR','Annual Recurring Revenue','MRR × 12. The annualized view. How the business performs year over year.'],
+            ['TCV','Total Contract Value','Full value of all active agreements across their entire contract term. What\'s committed on the books.'],
+          ].map(([abbr,name,desc])=>`
+            <div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
+                <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:${NAVY};">${abbr}</span>
+                <span style="font-size:10px;font-weight:600;color:var(--text-mid);">${name}</span>
+              </div>
+              <div style="font-size:11px;color:var(--text-muted);line-height:1.5;">${desc}</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+    </div>`;
+}
+
+function renderDashboard(){
+  const p=state.pack;
+  const d=p.dashboard;
+  const vs=p.validationSummary||{};
+  const vsColor=vs.overall_status==='CRITICAL'?'var(--danger)':vs.overall_status==='REVIEW'?'var(--warning)':'var(--success)';
+  const vsBg=vs.overall_status==='CRITICAL'?'var(--danger-bg)':vs.overall_status==='REVIEW'?'var(--warning-bg)':'var(--success-bg)';
+  const vsBorder=vs.overall_status==='CRITICAL'?'var(--danger-border)':vs.overall_status==='REVIEW'?'var(--warning-border)':'var(--success-border)';
+  const baselinePct=d.portfolioBaseline>0?(d.currentFileTotal/d.portfolioBaseline*100):0;
+  const bobColor=baselinePct>=95?'var(--success)':baselinePct>=80?'var(--warning)':'var(--danger)';
+  const wowPos=d.wowDelta>=0;
+  const mrr=d.teamMrr||0, arr=d.teamArr||0, tcv=d.teamTcv||0;
+  const dMrr=d.declinedMrr||0, dArr=d.declinedArr||0, dTcv=d.declinedTcv||0;
+  const mrrRisk=mrr>0?(dMrr/mrr*100):0;
+  const arrRisk=arr>0?(dArr/arr*100):0;
+  const tcvRisk=tcv>0?(dTcv/tcv*100):0;
+
+  const repData=CS_REP_NAMES.map(name=>{
+    const h=p.health.find(r=>r.rep===name)||{};
+    const b=p.bandwidth.find(r=>r.rep===name)||{};
+    const bob=CONTEST_BOB[name]||0;
+    return{name,h,b,bob};
+  });
+
+  const arc=(cx,cy,radius,pct,color,sw)=>{
+    const angle=Math.min((pct/100)*360,359.9);
+    const rad=angle*Math.PI/180;
+    const x=cx+radius*Math.sin(rad);
+    const y=cy-radius*Math.cos(rad);
+    const large=angle>180?1:0;
+    return`<path d="M ${cx} ${cy-radius} A ${radius} ${radius} 0 ${large} 1 ${x.toFixed(2)} ${y.toFixed(2)}" fill="none" stroke="${color}" stroke-width="${sw}" stroke-linecap="round"/>`;
+  };
+
+  return`
+    <div class="fade">
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);padding:6px 12px;background:var(--card-alt);border-radius:6px;border:1px solid var(--border);">${p.weekDate} &nbsp;&#xb7;&nbsp; ${d.healthModel}</div>
+        <div onclick="setTab(9)" style="cursor:pointer;padding:6px 14px;border-radius:6px;background:${vsBg};border:1px solid ${vsBorder};display:flex;align-items:center;gap:8px;">
+          <div style="width:6px;height:6px;border-radius:50%;background:${vsColor};"></div>
+          <span style="font-size:10px;font-weight:700;color:${vsColor};letter-spacing:0.1em;text-transform:uppercase;">${vs.overall_status||'—'}</span>
+          <span style="font-size:10px;color:var(--text-muted);">${vs.passed||0}P &#xb7; ${vs.warned||0}W &#xb7; ${vs.failed||0}F &nbsp;&#x2192; Validation</span>
+        </div>
+      </div>
+
+      <!-- COMMAND TILES -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;">
+        <div style="background:${NAVY};border-radius:10px;padding:16px 18px;">
+          <div style="font-size:9px;font-weight:700;color:rgba(255,255,255,0.45);letter-spacing:0.14em;text-transform:uppercase;margin-bottom:6px;">Portfolio Baseline</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;color:#fff;line-height:1;margin-bottom:5px;">${fmt$(d.portfolioBaseline)}</div>
+          <div style="font-size:9px;color:rgba(255,255,255,0.35);">Static Truth &#xb7; Locked</div>
+        </div>
+        <div style="background:${baselinePct>=95?'var(--success-bg)':baselinePct>=80?'var(--warning-bg)':'var(--danger-bg)'};border:1.5px solid ${baselinePct>=95?'var(--success-border)':baselinePct>=80?'var(--warning-border)':'var(--danger-border)'};border-radius:10px;padding:16px 18px;">
+          <div style="font-size:9px;font-weight:700;color:var(--text-muted);letter-spacing:0.14em;text-transform:uppercase;margin-bottom:6px;">In Scope BoB</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;color:${NAVY};line-height:1;margin-bottom:6px;">${fmt$(d.currentFileTotal)}</div>
+          <div style="height:3px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:4px;"><div style="height:100%;width:${Math.min(baselinePct,100).toFixed(1)}%;background:${bobColor};border-radius:2px;"></div></div>
+          <div style="font-size:9px;color:var(--text-muted);">${fmtPct(baselinePct)} of baseline</div>
+        </div>
+        <div style="background:var(--danger-bg);border:1.5px solid var(--danger-border);border-radius:10px;padding:16px 18px;">
+          <div style="font-size:9px;font-weight:700;color:var(--danger);letter-spacing:0.14em;text-transform:uppercase;margin-bottom:6px;opacity:0.8;">Total Declined TCV</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;color:var(--danger);line-height:1;margin-bottom:5px;">${fmt$(d.totalDeclined)}</div>
+          <div style="font-size:9px;color:var(--danger);opacity:0.7;">${fmtPct(d.riskPct)} Risk &#xb7; MRR ${fmt$(dMrr)}</div>
+        </div>
+        <div style="background:${tierBg(d.healthTier)};border:1.5px solid ${tierColor(d.healthTier)}44;border-radius:10px;padding:16px 18px;">
+          <div style="font-size:9px;font-weight:700;color:var(--text-muted);letter-spacing:0.14em;text-transform:uppercase;margin-bottom:6px;">Team Health Score</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;color:${tierColor(d.healthTier)};line-height:1;margin-bottom:5px;">${d.healthScore.toFixed(1)}<span style="font-size:11px;font-weight:400;color:var(--text-muted);margin-left:3px;">/100</span></div>
+          <div style="font-size:9px;color:var(--text-muted);">${d.healthTier} &#xb7; 4-Factor Model</div>
+        </div>
+      </div>
+
+      <!-- ESRI CANVAS 2x2 -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+
+        <!-- TL: CHOROPLETH -->
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px;">
+          <div style="font-size:9px;font-weight:700;color:${NAVY};letter-spacing:0.14em;text-transform:uppercase;margin-bottom:10px;">Portfolio Risk — National View</div>
+          <div style="background:var(--card-alt);border:1px solid var(--border);border-radius:8px;overflow:hidden;position:relative;">
+            <div id="risk-map-container" style="width:100%;height:200px;border-radius:8px;"></div>
+            <div style="position:absolute;bottom:6px;right:8px;font-size:9px;color:#333;background:rgba(255,255,255,0.92);padding:2px 7px;border-radius:4px;font-family:'JetBrains Mono',monospace;z-index:1000;">Risk ${fmtPct(d.riskPct)}</div>
+          </div>
+          <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;">
+            ${[['Low','#4ade80'],['Moderate','#facc15'],['High','#fb923c'],['Critical','#ef4444']].map(([l,c])=>`<div style="display:flex;align-items:center;gap:4px;"><div style="width:9px;height:9px;border-radius:2px;background:${c};"></div><span style="font-size:9px;color:var(--text-muted);">${l}</span></div>`).join('')}
+          </div>
+          <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            ${[['WOW Delta',p.isWeek1?'Baseline Set':fmt$(d.wowDelta),wowPos||p.isWeek1?'var(--blue)':'var(--danger)'],
+               ['Risk %',fmtPct(d.riskPct),'var(--danger)'],
+               ['Digital Mix',fmtPct(d.digitalMix),'var(--purple)'],
+               ['Export',d.exportFlag,d.exportFlag==='OK'?'var(--success)':'var(--danger)']
+            ].map(([lbl,val,col])=>`<div style="background:var(--card-alt);border:1px solid var(--border);border-radius:6px;padding:7px 10px;"><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px;">${lbl}</div><div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:${col};">${val}</div></div>`).join('')}
+          </div>
+        </div>
+
+        <!-- TR: HEAT MAP -->
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px;">
+          <div style="font-size:9px;font-weight:700;color:${NAVY};letter-spacing:0.14em;text-transform:uppercase;margin-bottom:10px;">Rep Risk Heat Map</div>
+          <table style="width:100%;border-collapse:collapse;">
+            <thead>
+              <tr style="background:${NAVY_PALE};">
+                <th style="padding:5px 8px;font-size:9px;color:${NAVY};font-weight:700;letter-spacing:0.06em;text-align:left;">Rep</th>
+                ${['Health','Risk','Digital','BW','Declined'].map(h=>`<th style="padding:5px 8px;font-size:9px;color:${NAVY};font-weight:700;letter-spacing:0.06em;text-align:center;">${h}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${repData.map(({name,h,b})=>{
+                const hs=h.healthScore||0,rp=h.riskPct||0,dm=h.digitalMix||0;
+                const bwPct=b.active?(b.active/BANDWIDTH_CEILING*100):0;
+                const dp=b.active?((b.declined||0)/b.active*100):0;
+                const bg=(v,lo,hi,rev)=>rev?(v>=hi?'#dcfce7':v>=lo?'#fef9c3':'#fee2e2'):(v>=hi?'#fee2e2':v>=lo?'#fef9c3':'#dcfce7');
+                const tx=(v,lo,hi,rev)=>rev?(v>=hi?'#166534':v>=lo?'#854d0e':'#991b1b'):(v>=hi?'#991b1b':v>=lo?'#854d0e':'#166534');
+                const cell=(v,lo,hi,rev,fmt)=>`<td style="padding:4px;text-align:center;"><div style="background:${bg(v,lo,hi,rev)};border-radius:4px;padding:4px 2px;"><span style="font-size:10px;font-weight:700;font-family:'JetBrains Mono',monospace;color:${tx(v,lo,hi,rev)};">${fmt}</span></div></td>`;
+                return`<tr style="border-top:1px solid var(--border);">
+                  <td style="padding:6px 8px;font-size:10px;font-weight:700;color:${NAVY};white-space:nowrap;">${name.split(' ')[0]}</td>
+                  ${cell(hs,55,70,true,hs.toFixed(0))}
+                  ${cell(rp,25,45,false,fmtPct(rp))}
+                  ${cell(dm,20,30,true,fmtPct(dm))}
+                  ${cell(bwPct,80,100,false,String(b.active||0))}
+                  ${cell(dp,25,40,false,String(b.declined||0))}
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+          <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);">
+            <div style="font-size:9px;font-weight:700;color:${NAVY};letter-spacing:0.14em;text-transform:uppercase;margin-bottom:8px;">Revenue Snapshot</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+              ${[['MRR',mrr,mrrRisk],['ARR',arr,arrRisk],['TCV',tcv,tcvRisk]].map(([lbl,val,risk])=>`<div style="background:var(--card-alt);border:1px solid var(--border);border-radius:6px;padding:8px 10px;"><div style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:3px;">${lbl}</div><div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:${NAVY};">${fmt$(val)}</div><div style="font-size:9px;color:var(--danger);">${fmtPct(risk)} at risk</div></div>`).join('')}
+            </div>
+          </div>
+        </div>
+
+        <!-- BL: RING GAUGES -->
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px;">
+          <div style="font-size:9px;font-weight:700;color:${NAVY};letter-spacing:0.14em;text-transform:uppercase;margin-bottom:10px;">Rep Portfolio Rings — Health &#xb7; Bandwidth &#xb7; BoB</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+            ${repData.map(({name,h,b,bob})=>{
+              const hs=h.healthScore||0;
+              const bwPct=Math.min((b.active||0)/BANDWIDTH_CEILING*100,100);
+              const hCol=tierColor(h.healthTier);
+              const bwCol=b.over?'var(--danger)':bwPct>=85?'var(--warning)':'#16a34a';
+              const cx=40,cy=40,r1=30,r2=20;
+              return`<div style="background:var(--card-alt);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center;">
+                <svg width="80" height="80" style="display:block;margin:0 auto 4px;overflow:visible;">
+                  <circle cx="${cx}" cy="${cy}" r="${r1}" fill="none" stroke="var(--border)" stroke-width="5"/>
+                  <circle cx="${cx}" cy="${cy}" r="${r2}" fill="none" stroke="var(--border)" stroke-width="5"/>
+                  ${arc(cx,cy,r1,hs,hCol,5)}
+                  ${arc(cx,cy,r2,bwPct,bwCol,5)}
+                  <text x="${cx}" y="${cy+4}" text-anchor="middle" font-size="11" font-weight="700" fill="${NAVY}" font-family="'JetBrains Mono',monospace">${hs.toFixed(0)}</text>
+                </svg>
+                <div style="font-size:10px;font-weight:700;color:${NAVY};margin-bottom:2px;">${name.split(' ')[0]}</div>
+                <div style="font-size:9px;color:var(--text-muted);margin-bottom:3px;">${fmt$(bob)}</div>
+                <div style="display:flex;justify-content:center;gap:6px;">
+                  <div style="display:flex;align-items:center;gap:2px;"><div style="width:6px;height:6px;border-radius:50%;background:${hCol};"></div><span style="font-size:8px;color:var(--text-muted);">H</span></div>
+                  <div style="display:flex;align-items:center;gap:2px;"><div style="width:6px;height:6px;border-radius:50%;background:${bwCol};"></div><span style="font-size:8px;color:var(--text-muted);">BW</span></div>
+                </div>
+                ${b.over?`<div style="font-size:8px;color:var(--danger);font-weight:700;margin-top:2px;">CEILING</div>`:''}
+              </div>`;
+            }).join('')}
+          </div>
+          <div style="margin-top:10px;padding:7px 12px;background:${NAVY_PALE};border-radius:6px;display:flex;gap:14px;font-size:9px;color:var(--text-muted);">
+            <span>Outer = Health score (0-100)</span>
+            <span>&#xb7;</span>
+            <span>Inner = Bandwidth % of 500 ceiling</span>
+          </div>
+        </div>
+
+        <!-- BR: SPARK LINES -->
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px;">
+          <div style="font-size:9px;font-weight:700;color:${NAVY};letter-spacing:0.14em;text-transform:uppercase;margin-bottom:12px;">Health Trend — 8-Week Spark Lines</div>
+          <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px;">
+            ${repData.map(({name,h})=>{
+              const score=h.healthScore||0;
+              const tier=h.healthTier||'At Risk';
+              const col=tierColor(tier);
+              const pts=sparkPoints(name,score);
+              const minY=Math.min(...pts),maxY=Math.max(...pts);
+              const range=maxY-minY||1;
+              const svgW=120,svgH=30;
+              const toY=v=>svgH-((v-minY)/range*(svgH-4))-2;
+              const pathD=pts.map((v,i)=>`${i===0?'M':'L'} ${(i/(pts.length-1)*svgW).toFixed(1)} ${toY(v).toFixed(1)}`).join(' ');
+              return`<div style="display:flex;align-items:center;gap:10px;">
+                <div style="font-size:10px;font-weight:700;color:${NAVY};width:50px;flex-shrink:0;">${name.split(' ')[0]}</div>
+                <svg width="${svgW}" height="${svgH}" style="flex-shrink:0;overflow:visible;">
+                  <path d="${pathD}" fill="none" stroke="${col}44" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
+                  <path d="${pathD}" fill="none" stroke="${col}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+                  <circle cx="${svgW}" cy="${toY(pts[pts.length-1]).toFixed(1)}" r="3" fill="${col}"/>
+                </svg>
+                <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:${col};width:34px;">${score.toFixed(1)}</span>
+                <span class="pill" style="color:${col};background:${tierBg(tier)};border-color:${col}33;font-size:8px;">${tier}</span>
+              </div>`;
+            }).join('')}
+          </div>
+          <div style="padding-top:10px;border-top:1px solid var(--border);">
+            <div style="font-size:9px;font-weight:700;color:${NAVY};letter-spacing:0.14em;text-transform:uppercase;margin-bottom:6px;">Score Bands</div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;">
+              ${[['85+','Excellent','#16a34a'],['70-84','Healthy','#2563eb'],['55-69','Watchlist','#d97706'],['<55','At Risk','#dc2626']].map(([r,l,c])=>`<div style="display:flex;align-items:center;gap:4px;"><div style="width:9px;height:9px;border-radius:2px;background:${c};"></div><span style="font-size:9px;color:var(--text-muted);">${r} ${l}</span></div>`).join('')}
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>`;
+}
+
+function renderBiWeekly(){
+  const d=state.pack.dashboard;
+  const p=state.pack;
+  return`
+    <div class="fade">
+      <div class="sl"><span>Bi-Weekly Performance Tracker</span></div>
+      ${p.isWeek1?`<div style="padding:10px 14px;background:var(--blue-bg);border:1px solid var(--blue-border);border-radius:8px;margin-bottom:14px;font-size:12px;color:var(--blue);">Week 1 run — WOW comparison will be available from Week 2 onward once the prior Executive Pack is loaded.</div>`:''}
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:12px;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead><tr style="background:${NAVY_PALE};">${['Metric','Prior Week','Current Week','WOW Delta'].map(h=>`<th style="padding:10px 16px;text-align:left;font-size:11px;font-weight:600;color:${NAVY};letter-spacing:0.06em;">${h}</th>`).join('')}</tr></thead>
+          <tbody>
+            <tr style="border-top:1px solid var(--border);">
+              <td style="padding:12px 16px;font-size:12px;font-weight:500;color:var(--text-mid);">Portfolio Total</td>
+              <td style="padding:12px 16px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-muted);">${p.isWeek1?'—':fmt$(d.portfolioBaseline)}</td>
+              <td style="padding:12px 16px;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:${NAVY};">${fmt$(d.currentFileTotal)}</td>
+              <td style="padding:12px 16px;font-family:'JetBrains Mono',monospace;font-size:12px;color:${d.wowDelta>=0?'var(--success)':'var(--danger)'};font-weight:600;">${p.isWeek1?'Baseline Set':fmt$(d.wowDelta)}</td>
+            </tr>
+            <tr style="border-top:1px solid var(--border);background:var(--danger-bg);">
+              <td style="padding:12px 16px;font-size:12px;font-weight:500;color:var(--text-mid);">Declined Dollars</td>
+              <td style="padding:12px 16px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-muted);">—</td>
+              <td style="padding:12px 16px;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:var(--danger);">${fmt$(d.totalDeclined)}</td>
+              <td style="padding:12px 16px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-muted);">${p.isWeek1?'Establishing':'—'}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function renderSegmentation(){
+  const cats=[['declined','Declined','var(--danger)'],['printOnly','Print Only Upsell','var(--warning)'],['renewable','Renewable','var(--success)']];
+  const rows=state.segData[state.segCategory]||[];
+  const p=state.pack;
+  const counts=p.segCounts;
+
+  const inputS='font-size:10px;border:1px solid var(--border);border-radius:4px;padding:3px 5px;background:var(--card);color:var(--text);width:100%;font-family:Inter,system-ui,sans-serif;';
+
+  return`
+    <div class="fade">
+      <div style="display:flex;gap:8px;margin-bottom:16px;">
+        ${cats.map(([key,label,col])=>`
+          <button onclick="setSegCat('${key}')" style="padding:8px 16px;border-radius:6px;border:1.5px solid ${state.segCategory===key?col.replace('var(--','').replace(')',''):'var(--border)'};background:${state.segCategory===key?col.replace('var(--','').replace(')','')+'18':'var(--card)'};color:${state.segCategory===key?col:'var(--text-muted)'};font-size:11px;font-weight:${state.segCategory===key?600:400};cursor:pointer;font-family:'Inter',system-ui,sans-serif;">
+            ${label} <span style="font-family:'JetBrains Mono',monospace;font-size:10px;margin-left:4px;">${counts[key]?.count||0}</span>
+          </button>
+        `).join('')}
+      </div>
+      <div style="font-size:10px;color:var(--text-muted);margin-bottom:12px;padding:8px 12px;background:var(--card-alt);border-radius:6px;border:1px solid var(--border);">
+        Top 20 per rep · Ranked highest to lowest by dollar · Alphabetical by rep · Enter penetration data directly — this is the living document
+      </div>
+      ${rows.length===0?`<div style="padding:40px;text-align:center;color:var(--text-muted);font-size:13px;">No accounts in this segment for the current file.</div>`:`
+      <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:11px;min-width:${state.segCategory==='declined'?1700:1500}px;">
+          <thead>
+            <tr style="background:${NAVY_PALE};position:sticky;top:0;">
+              ${['Agreement #','Client','Rep','Subtotal','Sale Items','Digital','Trend','Health',
+                'Contacted','Contact Type','Contact Date','Status','Blocker','Next Step','Next Step Date','Outcome','IDP','Notes'
+              ].map(h=>`<th style="padding:8px 10px;text-align:left;font-weight:600;color:${NAVY};letter-spacing:0.04em;white-space:nowrap;border-bottom:1px solid var(--border);font-size:10px;">${h}</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map((row,idx)=>{
+              const isNewRep=idx===0||rows[idx-1].rep!==row.rep;
+              const _hs=clientHealthScore(row);const _hsTier=healthTier(_hs);const _hsCol=tierColor(_hsTier);
+              return`
+                ${isNewRep?`<tr><td colspan="99" style="padding:8px 10px;background:${NAVY};color:white;font-size:10px;font-weight:700;letter-spacing:0.08em;">${row.rep}</td></tr>`:''}
+                <tr class="seg-row" style="border-bottom:1px solid var(--border);background:${idx%2===0?'var(--card)':'var(--card-alt)'};transition:background 0.15s;">
+                  <td style="padding:7px 10px;font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:600;color:${NAVY};white-space:nowrap;">${row.agreementNum}</td>
+                  <td style="padding:7px 10px;font-size:11px;font-weight:500;color:var(--text);white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis;" title="${row.client}">${row.client}</td>
+                  <td style="padding:7px 10px;font-size:10px;color:var(--text-muted);white-space:nowrap;">${row.rep.split(' ')[0]}</td>
+                  <td style="padding:7px 10px;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:${NAVY};white-space:nowrap;">${fmt$(row.subtotal)}</td>
+                  <td style="padding:7px 10px;font-size:10px;color:var(--text-muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;" title="${row.saleItems}">${row.saleItems}</td>
+                  <td style="padding:7px 10px;"><span style="font-size:9px;font-weight:600;color:${row.digital==='Digital'?'var(--purple)':'var(--text-muted)'};background:${row.digital==='Digital'?'var(--purple-bg)':'transparent'};border-radius:3px;padding:1px 5px;">${row.digital}</span></td>
+                  <td style="padding:7px 10px;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:${row.declineTrend==='▲'?'var(--danger)':row.declineTrend==='▼'?'var(--success)':'var(--text-muted)'};text-align:center;">${row.declineTrend}</td>
+                  <td style="padding:7px 10px;text-align:center;white-space:nowrap;">
+                    <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:${_hsCol};line-height:1;">${_hs.toFixed(0)}</div>
+                    <div style="font-size:8px;font-weight:600;color:${_hsCol};letter-spacing:0.04em;margin-top:1px;">${_hsTier}</div>
+                  </td>
+                  <td style="padding:7px 10px;"><select onchange="updateSeg('${state.segCategory}',${idx},'contacted',this.value)" style="${inputS}color:${row.contacted==='Yes'?'var(--success)':row.contacted==='No'?'var(--danger)':'var(--text)'};">${DROPDOWN.contacted.map(o=>`<option value="${o}" ${row.contacted===o?'selected':''}>${o||'Select...'}</option>`).join('')}</select></td>
+                  <td style="padding:7px 10px;"><select onchange="updateSeg('${state.segCategory}',${idx},'contactType',this.value)" style="${inputS}">${DROPDOWN.contactType.map(o=>`<option value="${o}" ${row.contactType===o?'selected':''}>${o||'Select...'}</option>`).join('')}</select></td>
+                  <td style="padding:7px 10px;"><input type="date" value="${row.contactDate||''}" onchange="updateSeg('${state.segCategory}',${idx},'contactDate',this.value)" style="${inputS}min-width:110px;"/></td>
+                  <td style="padding:7px 10px;"><select onchange="updateSeg('${state.segCategory}',${idx},'statusField',this.value)" style="${inputS}color:${row.statusField==='Save Closed'?'var(--success)':row.statusField==='Escalated'?'var(--danger)':'var(--text)'};">${DROPDOWN.status.map(o=>`<option value="${o}" ${row.statusField===o?'selected':''}>${o||'Select...'}</option>`).join('')}</select></td>
+                  <td style="padding:7px 10px;"><select onchange="updateSeg('${state.segCategory}',${idx},'blocker',this.value)" style="${inputS}">${DROPDOWN.blocker.map(o=>`<option value="${o}" ${row.blocker===o?'selected':''}>${o||'Select...'}</option>`).join('')}</select></td>
+                  <td style="padding:7px 10px;"><input type="text" value="${(row.nextStep||'').replace(/"/g,'&quot;')}" onchange="updateSeg('${state.segCategory}',${idx},'nextStep',this.value)" placeholder="Next step..." style="${inputS}min-width:120px;"/></td>
+                  <td style="padding:7px 10px;"><input type="date" value="${row.nextStepDate||''}" onchange="updateSeg('${state.segCategory}',${idx},'nextStepDate',this.value)" style="${inputS}min-width:110px;"/></td>
+                  <td style="padding:7px 10px;"><input type="text" value="${(row.outcome||'').replace(/"/g,'&quot;')}" onchange="updateSeg('${state.segCategory}',${idx},'outcome',this.value)" placeholder="Outcome..." style="${inputS}min-width:100px;"/></td>
+                  <td style="padding:7px 10px;"><select onchange="updateSeg('${state.segCategory}',${idx},'idp',this.value)" style="${inputS}color:${row.idp==='Yes'?'var(--success)':'var(--text)'};">${DROPDOWN.idp.map(o=>`<option value="${o}" ${row.idp===o?'selected':''}>${o||'IDP...'}</option>`).join('')}</select></td>
+                  <td style="padding:7px 10px;"><input type="text" value="${(row.notes||'').replace(/"/g,'&quot;')}" onchange="updateSeg('${state.segCategory}',${idx},'notes',this.value)" placeholder="Notes..." style="${inputS}min-width:120px;"/></td>
+                </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`}
+    </div>`;
+}
+
+function renderHealthScorecard(){
+  const p=state.pack;
+  // Live recompute per-rep from current segData — engagement updates reflect immediately
+  const allSeg=[...state.segData.declined,...state.segData.printOnly,...state.segData.renewable];
+  const repLive={};
+  for(const name of CS_REP_NAMES){
+    const rows=allSeg.filter(r=>r.rep===name);
+    const scores=rows.map(r=>clientHealthScore(r));
+    const avg=scores.length>0?scores.reduce((s,v)=>s+v,0)/scores.length:0;
+    repLive[name]={
+      avg,tier:healthTier(avg),total:scores.length,
+      excellent:scores.filter(s=>s>=85).length,
+      healthy:scores.filter(s=>s>=70&&s<85).length,
+      watchlist:scores.filter(s=>s>=55&&s<70).length,
+      atRisk:scores.filter(s=>s<55).length
+    };
+  }
+  return`
+    <div class="fade">
+      <div class="sl"><span>Health Scorecard — CSOps Stability Framework</span></div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px;padding:10px 14px;background:${NAVY_PALE};border:1px solid ${NAVY}22;border-radius:8px;">
+        ${[['Renew Status','40 pts'],['Payment Health','30 pts'],['Digital','20 pts'],['Engagement','10 pts'],['Model','4-Factor']].map(([l,v])=>`
+          <div><div style="font-size:9px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:2px;">${l}</div><div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:${NAVY};">${v}</div></div>
+        `).join('')}
+      </div>
+      ${CS_REP_NAMES.map(name=>{
+        const rep=p.health.find(h=>h.rep===name)||{};
+        const bw=p.bandwidth.find(b=>b.rep===name)||{};
+        const rc=p.renewalConc.find(r=>r.rep===name)||{};
+        const live=repLive[name]||{avg:0,tier:'At Risk',total:0,excellent:0,healthy:0,watchlist:0,atRisk:0};
+        const tc=tierColor(live.tier),tb=tierBg(live.tier);
+        const tot=Math.max(live.total,1);
+        return`
+        <div style="background:${tb};border:1px solid ${tc}22;border-radius:8px;padding:14px 16px;margin-bottom:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div style="width:36px;height:36px;border-radius:50%;background:${NAVY_PALE};border:1.5px solid ${NAVY}33;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:${NAVY};flex-shrink:0;">${ini(name)}</div>
+              <div>
+                <div style="font-size:13px;font-weight:600;color:${NAVY};margin-bottom:3px;">${name}</div>
+                <div style="font-size:11px;color:var(--text-muted);">${fmt$(rep.inScope)} · Declined ${fmt$(rep.declinedRev)} · Risk ${fmtPct(rep.riskPct)} · Digital ${fmtPct(rep.digitalMix)}</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+              <span style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:${rep.declineTrend==='▲'?'var(--danger)':rep.declineTrend==='▼'?'var(--success)':'var(--text-muted)'};">${rep.declineTrend||'—'}</span>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:700;color:${tc};">${live.avg.toFixed(1)}<span style="font-size:14px;font-weight:400;color:var(--text-muted);margin-left:3px;">/ 100</span></div>
+              <span class="pill" style="color:${tc};background:white;border-color:${tc}44;">${live.tier}</span>
+            </div>
+          </div>
+          <!-- Client tier distribution stacked bar + counts -->
+          <div style="margin-bottom:10px;">
+            <div style="height:6px;border-radius:3px;overflow:hidden;display:flex;margin-bottom:6px;background:var(--border);">
+              <div style="width:${(live.excellent/tot*100).toFixed(1)}%;background:var(--success);"></div>
+              <div style="width:${(live.healthy/tot*100).toFixed(1)}%;background:var(--blue);"></div>
+              <div style="width:${(live.watchlist/tot*100).toFixed(1)}%;background:var(--warning);"></div>
+              <div style="width:${(live.atRisk/tot*100).toFixed(1)}%;background:var(--danger);"></div>
+            </div>
+            <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+              ${[['Excellent','excellent','var(--success)'],['Healthy','healthy','var(--blue)'],['Watchlist','watchlist','var(--warning)'],['At Risk','atRisk','var(--danger)']].map(([lbl,key,col])=>`
+              <div style="display:flex;align-items:center;gap:4px;">
+                <div style="width:8px;height:8px;border-radius:2px;background:${col};flex-shrink:0;"></div>
+                <span style="font-size:10px;color:var(--text-muted);">${lbl}</span>
+                <span style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:${col};">${live[key]}</span>
+                <span style="font-size:9px;color:var(--text-muted);">(${live.total>0?(live[key]/live.total*100).toFixed(0):0}%)</span>
+              </div>`).join('')}
+              <div style="margin-left:auto;font-size:9px;color:var(--text-muted);">${live.total} clients</div>
+            </div>
+          </div>
+          <!-- Bandwidth + Renewal Due -->
+          <div style="display:flex;gap:10px;padding-top:10px;border-top:1px solid ${tc}22;">
+            <div style="flex:1;padding:8px 10px;background:rgba(255,255,255,0.6);border-radius:6px;">
+              <div style="font-size:9px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Bandwidth</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:${bw.over?'var(--danger)':NAVY};">${bw.active}/${BANDWIDTH_CEILING} ${bw.over?'⚠':'✓'}</div>
+              <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">${bw.renewable}R · ${bw.declined}D · ${bw.cancelled}C</div>
+            </div>
+            <div style="flex:1;padding:8px 10px;background:rgba(255,255,255,0.6);border-radius:6px;">
+              <div style="font-size:9px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Renewal Due</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:${(rc.next30||0)>40?'var(--danger)':NAVY};">${rc.next30||0} in 30d</div>
+              <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">${rc.next60||0} in 60d · ${rc.next90||0} in 90d</div>
+            </div>
+          </div>
+        </div>`;
+      }).join('')}
+
+      <!-- ── 4-Factor Scoring Legend ────────────────────────── -->
+      <div style="background:var(--card-alt);border:1px solid var(--border);border-radius:10px;padding:16px 20px;margin-top:4px;">
+        <div style="font-size:9px;font-weight:700;color:${NAVY};letter-spacing:0.14em;text-transform:uppercase;margin-bottom:12px;">4-Factor Scoring Model — Point Breakdown per Account</div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;">
+
+          <!-- Factor 1 -->
+          <div>
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+              <div style="width:6px;height:6px;border-radius:50%;background:${NAVY};flex-shrink:0;"></div>
+              <span style="font-size:10px;font-weight:700;color:${NAVY};">Renew Status · 40 pts</span>
+            </div>
+            ${[['Renewable','40'],['Merged','20'],['Declined','0']].map(([lbl,pts])=>`
+            <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--border);">
+              <span style="font-size:10px;color:var(--text-mid);">${lbl}</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:${pts==='0'?'var(--danger)':pts==='40'?'var(--success)':'var(--warning)'};">${pts}</span>
+            </div>`).join('')}
+          </div>
+
+          <!-- Factor 2 -->
+          <div>
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+              <div style="width:6px;height:6px;border-radius:50%;background:${NAVY};flex-shrink:0;"></div>
+              <span style="font-size:10px;font-weight:700;color:${NAVY};">Payment Health · 30 pts</span>
+            </div>
+            ${[['Not past due','30'],['0–30 days','22'],['31–60 days','15'],['61–90 days','8'],['90+ days / Legal','0']].map(([lbl,pts])=>`
+            <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--border);">
+              <span style="font-size:10px;color:var(--text-mid);">${lbl}</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:${pts==='0'?'var(--danger)':pts==='30'?'var(--success)':'var(--warning)'};">${pts}</span>
+            </div>`).join('')}
+          </div>
+
+          <!-- Factor 3 -->
+          <div>
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+              <div style="width:6px;height:6px;border-radius:50%;background:${NAVY};flex-shrink:0;"></div>
+              <span style="font-size:10px;font-weight:700;color:${NAVY};">Digital Classification · 20 pts</span>
+            </div>
+            ${[['Print + Digital','20'],['Print Only','0']].map(([lbl,pts])=>`
+            <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--border);">
+              <span style="font-size:10px;color:var(--text-mid);">${lbl}</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:${pts==='0'?'var(--danger)':'var(--success)'};">${pts}</span>
+            </div>`).join('')}
+            <div style="margin-top:6px;font-size:9px;color:var(--text-muted);line-height:1.4;">Digital = Sale Items includes digital / listings / Google / Meta</div>
+          </div>
+
+          <!-- Factor 4 -->
+          <div>
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+              <div style="width:6px;height:6px;border-radius:50%;background:${NAVY};flex-shrink:0;"></div>
+              <span style="font-size:10px;font-weight:700;color:${NAVY};">Meaningful Engagement · 10 pts</span>
+            </div>
+            ${[['Contacted + Status + Next Step','10'],['Contacted + Status','6'],['Contacted only','3'],['No contact logged','0']].map(([lbl,pts])=>`
+            <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid var(--border);">
+              <span style="font-size:10px;color:var(--text-mid);">${lbl}</span>
+              <span style="font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;color:${pts==='0'?'var(--danger)':pts==='10'?'var(--success)':'var(--warning)'};">${pts}</span>
+            </div>`).join('')}
+            <div style="margin-top:6px;font-size:9px;color:var(--text-muted);line-height:1.4;">Reflects penetration logged in Segmentation tab</div>
+          </div>
+
+        </div>
+        <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);font-size:10px;color:var(--text-muted);line-height:1.6;">
+          <strong style="color:${NAVY};">Scoring method:</strong> Each account is scored 0–100 across all four factors. Rep score = average of all account scores.
+          Tiers: <strong style="color:var(--success);">Excellent ≥85</strong> · <strong style="color:var(--blue);">Healthy ≥70</strong> · <strong style="color:var(--warning);">Watchlist ≥55</strong> · <strong style="color:var(--danger);">At Risk &lt;55</strong>
+        </div>
+      </div>
+
+    </div>`;
+}
+
+function renderCoaching(){
+  const p=state.pack;
+  return`
+    <div class="fade">
+      <div style="padding:8px 14px;background:var(--card-alt);border:1px solid var(--border);border-radius:6px;font-size:11px;color:var(--text-muted);margin-bottom:14px;">All 6 CSOps Reps · Kala McNeely and Samantha Marcus coach directly from this document · All actions executable Monday morning</div>
+      <div style="background:${NAVY_PALE};border:1.5px solid ${NAVY}22;border-radius:10px;padding:16px 20px;margin-bottom:16px;">
+        <div style="font-size:10px;font-weight:700;color:${NAVY};letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px;">Primary Coaching Focus</div>
+        <p style="font-size:13px;color:var(--text-mid);line-height:1.75;margin:0;">
+          Team health ${p.dashboard.healthScore.toFixed(1)} ${p.dashboard.healthTier}. Portfolio risk at ${fmtPct(p.dashboard.riskPct)} with ${fmt$(p.dashboard.totalDeclined)} in declined exposure.
+          ${p.bandwidth.filter(b=>b.over).length>0?`${p.bandwidth.filter(b=>b.over).map(b=>b.rep.split(' ')[0]).join(' and ')} ${p.bandwidth.filter(b=>b.over).length>1?'are':'is'} over the ${BANDWIDTH_CEILING} active account ceiling.`:''}
+          Digital mix at ${fmtPct(p.dashboard.digitalMix)} — ${p.dashboard.digitalMix<30?`${(30-p.dashboard.digitalMix).toFixed(1)} points below 30% target`:'above target'}. This week requires documented save wins, not contact attempts.
+        </p>
+      </div>
+      ${CS_REP_NAMES.map(name=>{
+        const m=p.health.find(h=>h.rep===name)||{};
+        const bw=p.bandwidth.find(b=>b.rep===name)||{};
+        const rc=p.renewalConc.find(r=>r.rep===name)||{};
+        const actions=p.coachingActions[name]||[];
+        const over=bw.over;
+        return`
+        <div style="background:var(--card);border:1px solid ${over?'var(--danger-border)':'var(--border)'};border-radius:10px;padding:16px 20px;margin-bottom:12px;">
+          <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border);">
+            <div style="width:34px;height:34px;border-radius:50%;background:${NAVY_PALE};border:1.5px solid ${NAVY}33;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:${NAVY};flex-shrink:0;">${ini(name)}</div>
+            <div style="flex:1;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;flex-wrap:wrap;">
+                <div style="font-size:13px;font-weight:700;color:${NAVY};">${name}</div>
+                ${over?`<span class="pill" style="color:var(--danger);background:var(--danger-bg);border-color:var(--danger-border);">Over Ceiling</span>`:''}
+                <span class="pill" style="color:${tierColor(m.healthTier)};background:white;border-color:${tierColor(m.healthTier)}44;">${m.healthScore?.toFixed(1)} · ${m.healthTier}</span>
+              </div>
+              <div style="font-size:11px;color:var(--text-muted);line-height:1.6;">
+                Declined ${fmt$(m.declinedRev)} · Risk ${fmtPct(m.riskPct)} · Digital ${fmtPct(m.digitalMix)} · Trend ${m.declineTrend} · ${bw.active}/${BANDWIDTH_CEILING} active · ${rc.next30||0} renewals due 30d
+              </div>
+            </div>
+          </div>
+          ${actions.map((a,j)=>`
+            <div style="display:flex;gap:10px;margin-bottom:10px;align-items:flex-start;">
+              <div style="width:22px;height:22px;border-radius:50%;background:${NAVY_PALE};border:1px solid ${NAVY}22;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:${NAVY};flex-shrink:0;">${j+1}</div>
+              <span style="font-size:12px;color:var(--text-mid);line-height:1.65;padding-top:2px;">${a}</span>
+            </div>
+          `).join('')}
+          <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+            <div style="font-size:10px;font-weight:600;color:${NAVY};letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px;">Manual Coaching Context</div>
+            <textarea id="manual-${name.replace(/ /g,'_')}" onchange="updateManual('${name}',this.value)" placeholder="Add real-world context not captured by the system — field observations, conversations, situations. Gets woven into the directive and locked into the pack." style="width:100%;min-height:72px;resize:vertical;border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:11px;color:var(--text);background:var(--card-alt);line-height:1.6;font-family:'Inter',system-ui,sans-serif;">${state.manualContexts[name]||''}</textarea>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
+function renderFlipPipeline(){
+  const fp=state.pack.flipPipeline;
+  const sc=fp.stageCounts||{};
+  const flipPubs=fp.flipPublications||[];
+  return`
+    <div class="fade">
+      <div class="sl"><span>Flip Pipeline — Readiness Intelligence</span></div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;">
+        ${[['Stage 1','No Contact','var(--danger)','var(--danger-bg)','var(--danger-border)'],['Stage 2','85% Intro','var(--warning)','var(--warning-bg)','var(--warning-border)'],['Stage 3','90% Align','var(--warning)','var(--warning-bg)','var(--warning-border)'],['Stage 4','95% Handoff','var(--success)','var(--success-bg)','var(--success-border)']].map(([s,l,col,bg,bc],i)=>`
+          <div style="background:${bg};border:1px solid ${bc};border-radius:8px;padding:14px;text-align:center;">
+            <div style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px;">${s}</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:28px;font-weight:700;color:${col};line-height:1;">${sc[i+1]||0}</div>
+            <div style="font-size:10px;color:${col};font-weight:500;margin-top:4px;">${l}</div>
+          </div>
+        `).join('')}
+      </div>
+      ${flipPubs.length===0?`<div style="padding:20px;text-align:center;background:var(--card-alt);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--text-muted);">No publications currently flagged for Flip in the Go to Print file.</div>`:`
+        ${flipPubs.map(pub=>`
+          <div style="background:var(--card);border:1px solid ${pub.stageNum>=3?'var(--success-border)':'var(--danger-border)'};border-radius:8px;padding:14px 18px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="font-size:13px;font-weight:600;color:${NAVY};margin-bottom:3px;">${pub.publication}</div>
+              <div style="font-size:11px;color:var(--text-muted);margin-bottom:2px;">${pub.publisher} · ${pub.region} · ${pub.division}</div>
+              <div style="font-size:11px;color:${pub.stageNum>=3?'var(--success)':'var(--danger)'};font-weight:500;">${pub.label}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:${pub.stageNum>=3?'var(--success)':'var(--danger)'};">${fmtPct(pub.pctToBaseline*100)}</div>
+              <span class="pill" style="color:${pub.stageNum>=3?'var(--success)':'var(--danger)'};background:${pub.stageNum>=3?'var(--success-bg)':'var(--danger-bg)'};border-color:${pub.stageNum>=3?'var(--success-border)':'var(--danger-border)'};">${pub.stage}</span>
+            </div>
+          </div>
+        `).join('')}
+      `}
+    </div>`;
+}
+
+function renderDeclinePerformance(){
+  const p=state.pack;
+  const dps=p.declinePerformanceSummary||{};
+  const dp=p.declinePerformance||[];
+  const pendingCount=p.cancellationPendingCount||0;
+  const team=dps['_team']||{};
+
+  // Match rate
+  const totalAgr=dp.filter(r=>r.match_status!=='malformed').length;
+  const matchedAgr=dp.filter(r=>r.match_status==='matched').length;
+  const matchRate=totalAgr>0?((matchedAgr/totalAgr)*100):100;
+  const mrColor=matchRate>=70?'var(--success)':matchRate>=40?'var(--warning)':'var(--danger)';
+  const mrBg=matchRate>=70?'var(--success-bg)':matchRate>=40?'var(--warning-bg)':'var(--danger-bg)';
+  const mrBdr=matchRate>=70?'var(--success-border)':matchRate>=40?'var(--warning-border)':'var(--danger-border)';
+
+  // Top attrition reason (team)
+  const teamAttr=team.attrition_breakdown||{};
+  const topAttr=Object.entries(teamAttr).sort((a,b)=>b[1]-a[1]);
+
+  // Per-rep top attrition
+  const repTopAttr=name=>{
+    const ab=(dps[name]||{}).attrition_breakdown||{};
+    const top=Object.entries(ab).sort((a,b)=>b[1]-a[1]);
+    return top.length?top[0][0]:'—';
+  };
+
+  const tdS=`padding:10px 14px;font-family:'JetBrains Mono',monospace;font-size:12px;`;
+
+  return`
+    <div class="fade">
+
+      <!-- Header row: pending pipeline + match rate -->
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+        <div style="flex:1;padding:8px 14px;background:var(--blue-bg);border:1px solid var(--blue-border);border-radius:8px;display:flex;align-items:center;gap:10px;">
+          <span style="font-size:18px;">📋</span>
+          <div>
+            <div style="font-size:9px;font-weight:700;color:var(--blue);letter-spacing:0.12em;text-transform:uppercase;">Pending Pipeline · Form Responses 1</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;color:var(--blue);line-height:1.2;">${pendingCount} <span style="font-size:11px;font-weight:400;color:var(--text-muted);">submissions awaiting processing</span></div>
+          </div>
+        </div>
+        <div style="padding:12px 20px;background:${mrBg};border:1.5px solid ${mrBdr};border-radius:8px;text-align:center;flex-shrink:0;">
+          <div style="font-size:9px;font-weight:700;color:${mrColor};letter-spacing:0.12em;text-transform:uppercase;margin-bottom:4px;">Match Rate</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:28px;font-weight:700;color:${mrColor};line-height:1;">${matchRate.toFixed(1)}%</div>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">${matchedAgr} / ${totalAgr} confirmed</div>
+        </div>
+        <div style="padding:12px 20px;background:var(--card);border:1px solid var(--border);border-radius:8px;text-align:center;flex-shrink:0;">
+          <div style="font-size:9px;font-weight:700;color:var(--text-muted);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:4px;">DONE Submissions</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:28px;font-weight:700;color:${NAVY};line-height:1;">${dp.length}</div>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">${fmt$(team.matched_revenue_total||0)} confirmed revenue</div>
+        </div>
+      </div>
+
+      <!-- Form type split -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+        <div style="background:var(--danger-bg);border:1px solid var(--danger-border);border-radius:8px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-size:9px;font-weight:700;color:var(--danger);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:4px;">Decline Renewals</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:30px;font-weight:700;color:var(--danger);line-height:1;">${team.decline_renewals||0}</div>
+          </div>
+          <div style="font-size:10px;color:var(--text-muted);text-align:right;">
+            ${dp.length>0?fmtPct(((team.decline_renewals||0)/dp.length)*100):'—'} of submissions
+          </div>
+        </div>
+        <div style="background:var(--warning-bg);border:1px solid var(--warning-border);border-radius:8px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-size:9px;font-weight:700;color:var(--warning);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:4px;">Cancellations</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:30px;font-weight:700;color:var(--warning);line-height:1;">${team.cancellations||0}</div>
+          </div>
+          <div style="font-size:10px;color:var(--text-muted);text-align:right;">
+            ${dp.length>0?fmtPct(((team.cancellations||0)/dp.length)*100):'—'} of submissions
+          </div>
+        </div>
+      </div>
+
+      <!-- Per-rep summary cards -->
+      <div class="sl" style="margin-bottom:10px;"><span>Rep Performance · DONE Submissions</span></div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
+        ${CS_REP_NAMES.map(name=>{
+          const s=dps[name]||{};
+          const rMrColor=s.total_submissions>0?((s.matched_revenue_total||0)>0?'var(--success)':'var(--warning)'):'var(--text-muted)';
+          return`
+          <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;">
+            <div style="font-size:12px;font-weight:700;color:${NAVY};margin-bottom:10px;border-bottom:1px solid var(--border);padding-bottom:8px;">${name}</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+              <div>
+                <div style="font-size:9px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:2px;">Submissions</div>
+                <div style="font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;color:${NAVY};">${s.total_submissions||0}</div>
+                <div style="font-size:9px;color:var(--text-muted);margin-top:1px;">${s.decline_renewals||0} DR · ${s.cancellations||0} CX</div>
+              </div>
+              <div>
+                <div style="font-size:9px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:2px;">Save Offer Rate</div>
+                <div style="font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;color:${(s.save_offer_rate||0)>=50?'var(--success)':'var(--warning)'};">${(s.save_offer_rate||0).toFixed(1)}%</div>
+                <div style="font-size:9px;color:var(--text-muted);margin-top:1px;">of submissions</div>
+              </div>
+            </div>
+            <div style="background:var(--card-alt);border-radius:6px;padding:8px 10px;margin-bottom:8px;">
+              <div style="font-size:9px;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:2px;">Confirmed Revenue</div>
+              <div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:${rMrColor};">${fmt$(s.matched_revenue_total||0)}</div>
+              <div style="font-size:9px;color:var(--text-muted);">${(s.total_submissions||0)-(s.unmatched_count||0)-(s.malformed_count||0)} matched · ${s.unmatched_count||0} unmatched · ${s.malformed_count||0} malformed</div>
+            </div>
+            <div style="font-size:10px;color:var(--text-muted);">
+              <span style="font-weight:600;color:var(--text-mid);">Top Reason: </span>${repTopAttr(name)}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+
+      <!-- Team totals row -->
+      <div style="background:${NAVY};border-radius:10px;padding:14px 20px;margin-bottom:16px;display:grid;grid-template-columns:repeat(5,1fr);gap:16px;">
+        ${[
+          ['Team Total',`${team.total_submissions||0} submissions`,'#fff'],
+          ['Decline Renewals',`${team.decline_renewals||0}`,'#fff'],
+          ['Cancellations',`${team.cancellations||0}`,'#fff'],
+          ['Confirmed Revenue',fmt$(team.matched_revenue_total||0),'#fff'],
+          ['Save Offer Rate',`${(team.save_offer_rate||0).toFixed(1)}%`,'#fff'],
+        ].map(([lbl,val,col])=>`
+          <div style="text-align:center;">
+            <div style="font-size:9px;font-weight:700;color:rgba(255,255,255,0.5);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px;">${lbl}</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;color:${col};">${val}</div>
+          </div>
+        `).join('')}
+      </div>
+
+      <!-- Attrition breakdown table -->
+      <div class="sl" style="margin-bottom:10px;"><span>Attrition Reason Breakdown · Team</span></div>
+      ${topAttr.length===0?`<div style="padding:16px;background:var(--card-alt);border-radius:8px;font-size:12px;color:var(--text-muted);">No attrition reason data available.</div>`:`
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:20px;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead><tr style="background:${NAVY_PALE};">
+            ${['Attrition Reason','Count','% of Total','Bar'].map(h=>`<th style="padding:10px 14px;text-align:left;font-size:10px;font-weight:600;color:${NAVY};letter-spacing:0.06em;">${h}</th>`).join('')}
+          </tr></thead>
+          <tbody>
+            ${topAttr.map(([reason,count],i)=>{
+              const pct=dp.length>0?(count/dp.length*100):0;
+              return`<tr style="border-top:1px solid var(--border);background:${i%2===0?'var(--card)':'var(--card-alt)'};">
+                <td style="padding:10px 14px;font-size:12px;font-weight:500;color:var(--text-mid);">${reason||'(blank)'}</td>
+                <td style="padding:10px 14px;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:${NAVY};">${count}</td>
+                <td style="padding:10px 14px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-muted);">${fmtPct(pct)}</td>
+                <td style="padding:10px 14px;min-width:140px;">
+                  <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden;">
+                    <div style="height:100%;width:${pct.toFixed(1)}%;background:${NAVY};border-radius:3px;"></div>
+                  </div>
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`}
+
+    </div>`;
+}
+
+// ──────────────────────────────────────────────────────────────────
+// GRR CONTEST TRACKER
+// ──────────────────────────────────────────────────────────────────
+function renderContestTracker(){
+  const p=state.pack;
+  const dp=p.declinePerformance||[];
+  const renewableLookup=p.renewalLookup||{};
+  // Parse submission timestamp to Date
+  const parseCTS=ts=>{if(!ts)return null;const d=new Date(ts);if(!isNaN(d))return d;const m=String(ts).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);if(m)return new Date(+m[3],+m[1]-1,+m[2]);return null;};
+  // Set of current renewable agreement numbers
+  const renewableSet=new Set(state.segData.renewable.map(r=>r.agreementNum));
+
+  // Per-rep contest calc
+  const rc={};
+  for(const name of CS_REP_NAMES){
+    const startBob=CONTEST_BOB[name]||0;
+    // All matched decline/cancellation entries in contest period for this rep
+    const entries=dp.filter(e=>e.rep_name===name&&e.match_status==='matched'&&parseCTS(e.timestamp)>=CONTEST_START_DATE);
+    const churnRev=entries.reduce((s,e)=>s+(e.matched_revenue||0),0);
+    // Saves = accounts that are now Renewable (reversed)
+    const saveEntries=entries.filter(e=>renewableSet.has(e.agreement_number));
+    const saveRev=saveEntries.reduce((s,e)=>s+(e.matched_revenue||0),0);
+    const netChurn=Math.max(0,churnRev-saveRev);
+    const upsells=state.upsellLog.filter(u=>u.rep===name);
+    const upsellRev=upsells.reduce((s,u)=>s+(u.revenue||0),0);
+    const grr=startBob>0?((startBob-netChurn+upsellRev)/startBob*100):100;
+    rc[name]={startBob,churnRev,saveRev,netChurn,upsellRev,grr,saveCount:saveEntries.length,churnCount:entries.length,upsellCount:upsells.length,team:CONTEST_TEAM1.includes(name)?1:2};
+  }
+  // Team GRR = average of individual GRR% (per-capita normalization)
+  const t1Grr=CONTEST_TEAM1.reduce((s,n)=>s+(rc[n]?.grr||100),0)/CONTEST_TEAM1.length;
+  const t2Grr=CONTEST_TEAM2.reduce((s,n)=>s+(rc[n]?.grr||100),0)/CONTEST_TEAM2.length;
+  const t1Winning=t1Grr>=t2Grr;
+  // Individual ranking
+  const ranked=CS_REP_NAMES.slice().sort((a,b)=>(rc[b]?.grr||0)-(rc[a]?.grr||0));
+  const GOLD='#f0b429',SILVER='#a0aec0',BRONZE='#c07838';
+  const rankMedal=i=>i===0?`<span style="font-size:16px;">🥇</span>`:i===1?`<span style="font-size:16px;">🥈</span>`:i===2?`<span style="font-size:16px;">🥉</span>`:`<span style="font-size:12px;font-weight:700;color:var(--text-muted);">#${i+1}</span>`;
+  // Contest started gate (badges only visible on/after April 1 2026)
+  const contestStarted=new Date()>=CONTEST_START_DATE;
+  // Winning-team positional rank (0=1st within team, 1=2nd, 2=3rd, 3=4th/store-credit)
+  const winTeam=t1Winning?CONTEST_TEAM1:CONTEST_TEAM2;
+  const winTeamRanked=ranked.filter(n=>winTeam.includes(n)); // already GRR-sorted
+  const winTeamPos={}; winTeamRanked.forEach((n,i)=>{winTeamPos[n]=i;});
+  const teamColor=t=>`color:${t===1?'var(--blue)':'var(--purple)'}`;
+  const teamLabel=t=>`Team ${t} · ${t===1?'Kala · Karen · Genele':'Samantha · April · Alex'}`;
+  const grrColor=g=>g>=98?'var(--success)':g>=95?'var(--blue)':g>=90?'var(--warning)':'var(--danger)';
+
+  return`
+  <div class="fade">
+    <!-- Header -->
+    <div style="background:${NAVY};border-radius:10px;padding:14px 20px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <div style="font-size:14px;font-weight:700;color:white;letter-spacing:0.06em;margin-bottom:3px;">GRR CONTEST</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.6);">April 1 – December 31, 2026 · Best Version Media · Client Success Operations</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:10px;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.1em;">Gross Revenue Retention</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:rgba(255,255,255,0.7);margin-top:2px;">(Start BoB − Churn + Upsells) / Start BoB × 100</div>
+      </div>
+    </div>
+
+    <!-- Team Leaderboard -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+      ${[[1,CONTEST_TEAM1,t1Grr,t1Winning],[2,CONTEST_TEAM2,t2Grr,!t1Winning]].map(([tNum,members,tGrr,winning])=>`
+      <div style="background:${winning?NAVY:'var(--card)'};border:${winning?`2px solid ${NAVY}`:'1px solid var(--border)'};border-radius:10px;padding:16px 20px;position:relative;">
+        ${winning?`<div style="position:absolute;top:-10px;right:14px;background:#f0b429;color:${NAVY};font-size:9px;font-weight:700;letter-spacing:0.1em;padding:2px 8px;border-radius:10px;">LEADING</div>`:''}
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:${winning?'rgba(255,255,255,0.6)':'var(--text-muted)'};margin-bottom:6px;">Team ${tNum}</div>
+        <div style="font-size:12px;color:${winning?'rgba(255,255,255,0.8)':'var(--text-muted)'};margin-bottom:12px;">${members.join(' · ')}</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:36px;font-weight:700;color:${winning?'white':grrColor(tGrr)};line-height:1;">${tGrr.toFixed(2)}<span style="font-size:18px;font-weight:400;color:${winning?'rgba(255,255,255,0.5)':'var(--text-muted)'};">%</span></div>
+        <div style="font-size:10px;color:${winning?'rgba(255,255,255,0.5)':'var(--text-muted)'};margin-top:6px;">Avg per-capita GRR · ${members.length} reps</div>
+        ${winning&&!t1Winning===tNum-1?`<div style="margin-top:8px;font-size:10px;color:rgba(255,255,255,0.6);">+${Math.abs(tGrr-(tNum===1?t2Grr:t1Grr)).toFixed(2)}% advantage</div>`:''}
+      </div>`).join('')}
+    </div>
+
+    <!-- Individual Leaderboard -->
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;margin-bottom:16px;overflow:hidden;">
+      <div style="background:${NAVY};padding:10px 16px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:10px;font-weight:700;color:white;letter-spacing:0.1em;text-transform:uppercase;">Individual Leaderboard</span>
+        <span style="font-size:10px;color:rgba(255,255,255,0.5);">Ranked by GRR% · Per-capita normalized</span>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:11px;">
+        <thead>
+          <tr style="background:${NAVY_PALE};">
+            ${['Rank','Rep','Team','Start BoB','Churn','Saves','Net Churn','Upsells','GRR %'].map(h=>`<th style="padding:8px 12px;text-align:left;font-size:9px;font-weight:700;color:${NAVY};letter-spacing:0.08em;text-transform:uppercase;border-bottom:1px solid var(--border);">${h}</th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          ${ranked.map((name,i)=>{
+            const r=rc[name];
+            const inWinTeam=winTeam.includes(name);
+            const wtp=winTeamPos[name]; // 0-3 for winning team; undefined for losing team
+            // Badge: show only after contest start; losing-team reps get no badge
+            let prizeBadge='';
+            if(!contestStarted){
+              prizeBadge=`<span style="font-size:9px;color:var(--text-muted);background:var(--card-alt);border:1px solid var(--border);padding:1px 5px;border-radius:3px;margin-left:6px;">Contest begins April 1</span>`;
+            } else if(inWinTeam){
+              if(wtp<=2){
+                const bc=wtp===0?GOLD:wtp===1?SILVER:BRONZE;
+                prizeBadge=`<span style="font-size:9px;background:${bc};color:white;padding:1px 5px;border-radius:3px;margin-left:6px;">Prize eligible</span>`;
+              } else if(wtp===3){
+                prizeBadge=`<span style="font-size:9px;background:#6b7280;color:white;padding:1px 5px;border-radius:3px;margin-left:6px;">Store Credit</span>`;
+              }
+            }
+            return`
+            <tr style="border-bottom:1px solid var(--border);background:${i%2===0?'var(--card)':'var(--card-alt)'};">
+              <td style="padding:9px 12px;">${rankMedal(i)}</td>
+              <td style="padding:9px 12px;font-weight:600;color:${NAVY};">${name}${prizeBadge}</td>
+              <td style="padding:9px 12px;font-size:10px;color:var(--text-muted);">Team ${r.team}</td>
+              <td style="padding:9px 12px;font-family:'JetBrains Mono',monospace;font-weight:700;color:${NAVY};">${fmt$(r.startBob)}</td>
+              <td style="padding:9px 12px;font-family:'JetBrains Mono',monospace;color:var(--danger);">${r.churnRev>0?`−${fmt$(r.churnRev)}`:'—'}</td>
+              <td style="padding:9px 12px;font-family:'JetBrains Mono',monospace;color:var(--success);">${r.saveRev>0?`+${fmt$(r.saveRev)}`:'—'}</td>
+              <td style="padding:9px 12px;font-family:'JetBrains Mono',monospace;color:${r.netChurn>0?'var(--danger)':'var(--success)'};">${r.netChurn>0?`−${fmt$(r.netChurn)}`:'✓ $0'}</td>
+              <td style="padding:9px 12px;font-family:'JetBrains Mono',monospace;color:var(--blue);">${r.upsellRev>0?`+${fmt$(r.upsellRev)}`:'—'}</td>
+              <td style="padding:9px 12px;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <span style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:${grrColor(r.grr)};">${r.grr.toFixed(2)}%</span>
+                  <div style="width:60px;height:4px;background:var(--border);border-radius:2px;overflow:hidden;">
+                    <div style="width:${Math.min(r.grr,100).toFixed(1)}%;height:100%;background:${grrColor(r.grr)};"></div>
+                  </div>
+                </div>
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Prize Legend + Scoring Legend side by side -->
+    <div style="display:grid;grid-template-columns:1fr 1.5fr;gap:12px;margin-bottom:16px;">
+      <!-- Prize Legend -->
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+        <div style="background:${NAVY};padding:10px 16px;">
+          <span style="font-size:10px;font-weight:700;color:white;letter-spacing:0.1em;text-transform:uppercase;">Prize Legend</span>
+        </div>
+        <div style="padding:16px;">
+          ${[['🥇','1st Place','Trip (location TBD)',GOLD],['🥈','2nd Place','Home Office Upgrade',SILVER],['🥉','3rd Place','Dinner',BRONZE],['🏅','4th Place','Company Store Credit','#6b7280']].map(([emoji,place,prize,col])=>`
+          <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">
+            <div style="font-size:24px;flex-shrink:0;">${emoji}</div>
+            <div>
+              <div style="font-size:11px;font-weight:700;color:${NAVY};">${place}</div>
+              <div style="font-size:12px;color:var(--text-mid);margin-top:1px;">${prize}</div>
+            </div>
+          </div>`).join('')}
+          <div style="margin-top:10px;padding:8px 10px;background:${NAVY_PALE};border-radius:6px;font-size:10px;color:${NAVY};line-height:1.6;">
+            <strong>Note:</strong> All 4 prizes go to individuals <strong>within the winning team only,</strong> ranked by individual GRR%. 1st–3rd place receive their respective prizes; 4th place (lowest GRR% on the winning team) receives Company Store Credit.
+          </div>
+        </div>
+      </div>
+      <!-- Scoring Legend -->
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+        <div style="background:${NAVY};padding:10px 16px;">
+          <span style="font-size:10px;font-weight:700;color:white;letter-spacing:0.1em;text-transform:uppercase;">Scoring Legend</span>
+        </div>
+        <div style="padding:16px;">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:${NAVY};background:${NAVY_PALE};padding:8px 12px;border-radius:6px;margin-bottom:12px;">GRR % = (Start BoB − Churn + Upsells) / Start BoB × 100</div>
+          ${[
+            ['Churn','Revenue from cancelled or non-renewed accounts submitted via the cancellation/decline form during the contest period (April 1 – Dec 31 2026). Pulls from File 05 DONE tab, contest dates only.','var(--danger)'],
+            ['Saves','Accounts previously submitted as declined/cancelled that now appear as Renewable in the current renewal report. Saves are subtracted from Churn — they were rescued.','var(--success)'],
+            ['Upsells','New revenue above Start BoB logged manually via the form below. Auto-matched to Subtotal Sales from renewal report. Manual entry required.','var(--blue)'],
+            ['Per Capita','Team winner determined by average individual GRR% — not aggregate revenue. A rep with $3M book and 98% GRR contributes equally to a rep with $11M book and 98% GRR.','var(--warning)'],
+            ['Contest Period','April 1 – December 31, 2026. Only form submissions on or after April 1 count toward churn. Start BoB locked from April 1 run.','var(--text-muted)']
+          ].map(([term,def,col])=>`
+          <div style="margin-bottom:10px;">
+            <span style="font-size:10px;font-weight:700;color:${col};text-transform:uppercase;letter-spacing:0.06em;">${term}</span>
+            <div style="font-size:10px;color:var(--text-muted);line-height:1.5;margin-top:2px;">${def}</div>
+          </div>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <!-- Log Upsell Form -->
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;margin-bottom:16px;overflow:hidden;">
+      <div style="background:${NAVY};padding:10px 16px;">
+        <span style="font-size:10px;font-weight:700;color:white;letter-spacing:0.1em;text-transform:uppercase;">Log Upsell</span>
+        <span style="font-size:10px;color:rgba(255,255,255,0.5);margin-left:12px;">Manual entry only · Auto-matches revenue from renewal report</span>
+      </div>
+      <div style="padding:14px 16px;display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
+        <div>
+          <div style="font-size:9px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Agreement #</div>
+          <input id="ct-agr" type="text" placeholder="E-12345" style="padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:'JetBrains Mono',monospace;width:120px;background:var(--card);color:var(--text);"/>
+        </div>
+        <div>
+          <div style="font-size:9px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Rep</div>
+          <select id="ct-rep" style="padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;background:var(--card);color:var(--text);">
+            <option value="">Select rep...</option>
+            ${CS_REP_NAMES.map(n=>`<option value="${n}">${n}</option>`).join('')}
+          </select>
+        </div>
+        <div style="flex:1;min-width:180px;">
+          <div style="font-size:9px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Notes</div>
+          <input id="ct-notes" type="text" placeholder="Upsell description..." style="padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;width:100%;box-sizing:border-box;background:var(--card);color:var(--text);"/>
+        </div>
+        <button onclick="submitUpsell()" style="padding:8px 18px;background:${NAVY};color:white;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;">Add Upsell</button>
+      </div>
+    </div>
+
+    <!-- Upsell Log Table -->
+    ${state.upsellLog.length===0?`<div style="text-align:center;padding:24px;background:var(--card-alt);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--text-muted);">No upsells logged yet. Use the form above to add upsell entries.</div>`:`
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+      <div style="background:${NAVY};padding:10px 16px;display:flex;justify-content:space-between;align-items:center;">
+        <span style="font-size:10px;font-weight:700;color:white;letter-spacing:0.1em;text-transform:uppercase;">Upsell Log</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:rgba(255,255,255,0.6);">${state.upsellLog.length} entr${state.upsellLog.length===1?'y':'ies'} · ${fmt$(state.upsellLog.reduce((s,u)=>s+(u.revenue||0),0))} total</span>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:11px;">
+        <thead>
+          <tr style="background:${NAVY_PALE};">
+            ${['Date','Agreement #','Client','Rep','Revenue','Notes','Matched'].map(h=>`<th style="padding:8px 12px;text-align:left;font-size:9px;font-weight:700;color:${NAVY};letter-spacing:0.08em;text-transform:uppercase;border-bottom:1px solid var(--border);">${h}</th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          ${state.upsellLog.slice().reverse().map((u,i)=>`
+          <tr style="border-bottom:1px solid var(--border);background:${i%2===0?'var(--card)':'var(--card-alt)'};">
+            <td style="padding:8px 12px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);">${u.date}</td>
+            <td style="padding:8px 12px;font-family:'JetBrains Mono',monospace;font-weight:600;color:${NAVY};">${u.agreementNum}</td>
+            <td style="padding:8px 12px;color:var(--text);">${u.client}</td>
+            <td style="padding:8px 12px;color:var(--text);">${u.rep}</td>
+            <td style="padding:8px 12px;font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--blue);">+${fmt$(u.revenue)}</td>
+            <td style="padding:8px 12px;color:var(--text-muted);font-size:10px;">${u.notes||'—'}</td>
+            <td style="padding:8px 12px;">
+              <span style="font-size:9px;font-weight:600;color:${u.matched?'var(--success)':'var(--warning)'};background:${u.matched?'var(--success-bg)':'var(--warning-bg)'};padding:2px 6px;border-radius:3px;">${u.matched?'✓ MATCHED':'⚠ MANUAL'}</span>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`}
+  </div>`;
+}
+
+function submitUpsell(){
+  const agr=(document.getElementById('ct-agr')?.value||'').trim().toUpperCase();
+  const rep=document.getElementById('ct-rep')?.value||'';
+  const notes=(document.getElementById('ct-notes')?.value||'').trim();
+  if(!agr||!rep){alert('Agreement # and Rep are required.');return;}
+  const match=(state.pack?.renewalLookup||{})[agr];
+  const revenue=match?.subtotal||0;
+  const client=match?.client||'—';
+  state.upsellLog.push({
+    date:new Date().toISOString().split('T')[0],
+    agreementNum:agr,client,rep,revenue,notes,
+    matched:!!match
+  });
+  render();
+}
+
+function renderValidation(){
+  const p=state.pack;
+  const vs=p.validationSummary||{};
+  const checks=p.validations||[];
+  const sc=s=>s==='PASS'?'var(--success)':s==='WARN'?'var(--warning)':'var(--danger)';
+  const sb=s=>s==='PASS'?'var(--success-bg)':s==='WARN'?'var(--warning-bg)':'var(--danger-bg)';
+  const sbr=s=>s==='PASS'?'var(--success-border)':s==='WARN'?'var(--warning-border)':'var(--danger-border)';
+  const groups=[
+    {label:'Financial Reconciliation',names:['segment_revenue_reconcile','digital_print_reconcile','wow_delta_math','rep_inscope_reconcile']},
+    {label:'Health Score Validation',names:['health_score_components','team_health_reconcile']},
+    {label:'Bandwidth Validation',names:['bandwidth_math','team_bandwidth_reconcile']},
+    {label:'Cross-File Validation',names:['past_due_orphan_check','cancellation_match_rate','cancellation_orphan_check','rep_coverage','decline_performance_match_rate']},
+    {label:'Penetration Integrity',names:['stale_next_steps','save_closed_integrity','escalation_integrity']},
+    {label:'Export Integrity',names:['export_flag','duplicate_contracts']},
+  ];
+  const byName=Object.fromEntries(checks.map(c=>[c.name,c]));
+  const overallColor=vs.overall_status==='CRITICAL'?'var(--danger)':vs.overall_status==='REVIEW'?'var(--warning)':'var(--success)';
+  const overallBg=vs.overall_status==='CRITICAL'?'var(--danger-bg)':vs.overall_status==='REVIEW'?'var(--warning-bg)':'var(--success-bg)';
+  const overallBorder=vs.overall_status==='CRITICAL'?'var(--danger-border)':vs.overall_status==='REVIEW'?'var(--warning-border)':'var(--success-border)';
+  return`
+    <div class="fade">
+      <!-- Summary bar -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:8px;margin-bottom:18px;">
+        <div style="background:${overallBg};border:1.5px solid ${overallBorder};border-radius:8px;padding:12px 16px;display:flex;flex-direction:column;justify-content:center;">
+          <div style="font-size:9px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px;">Overall</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:${overallColor};">${vs.overall_status||'—'}</div>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">${vs.total_checks||0} checks run</div>
+        </div>
+        ${[['Passed','passed','var(--success)','var(--success-bg)','var(--success-border)'],
+           ['Warned','warned','var(--warning)','var(--warning-bg)','var(--warning-border)'],
+           ['Failed','failed','var(--danger)','var(--danger-bg)','var(--danger-border)'],
+           ['Checks','total_checks',NAVY,NAVY_PALE,NAVY+'33']
+          ].map(([l,k,col,bg,bdr])=>`
+          <div style="background:${bg};border:1px solid ${bdr};border-radius:8px;padding:12px 16px;">
+            <div style="font-size:9px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px;">${l}</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:700;color:${col};line-height:1;">${vs[k]||0}</div>
+          </div>
+        `).join('')}
+      </div>
+      <!-- Check groups -->
+      ${groups.map(g=>`
+        <div style="margin-bottom:16px;">
+          <div class="sl" style="margin-bottom:8px;"><span>${g.label}</span></div>
+          ${g.names.map(name=>{
+            const c=byName[name];
+            if(!c)return'';
+            return`
+            <div style="background:${c.status==='FAIL'?sb('FAIL'):'var(--card)'};border:1px solid ${c.status!=='PASS'?sbr(c.status):'var(--border)'};border-radius:6px;padding:10px 14px;margin-bottom:6px;display:grid;grid-template-columns:68px 200px 1fr 1fr;gap:10px;align-items:start;">
+              <span class="pill" style="color:${sc(c.status)};background:${sb(c.status)};border-color:${sbr(c.status)};justify-self:start;">${c.status}</span>
+              <div style="font-size:11px;font-weight:600;color:${NAVY};font-family:'JetBrains Mono',monospace;word-break:break-all;">${name}</div>
+              <div>
+                <div style="font-size:9px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:2px;">Value</div>
+                <div style="font-size:11px;font-weight:600;color:${sc(c.status)};">${c.value}</div>
+                <div style="font-size:10px;color:var(--text-muted);margin-top:1px;">Expected: ${c.expected}</div>
+              </div>
+              <div style="font-size:11px;color:var(--text-muted);line-height:1.55;">${c.note}</div>
+            </div>`;
+          }).join('')}
+        </div>
+      `).join('')}
+    </div>`;
+}
+
+function renderBrunoPanel(){
+  const BGUIDE=[
+    {step:'What RUN BRUNO does',body:'RUN BRUNO is the evaluation layer. It reads the penetration fields captured during the week and measures whether the coaching directive was actually executed. It never recalculates any financial metric. Portfolio Baseline, WOW, Risk, and Health are locked by RUN HANK.'},
+    {step:'What it looks at',body:'Bruno evaluates Contacted status, Contact Type, Current Status, Blockers, Next Steps, Outcomes, Save Offer Outcomes, and IDP assignment for every account in the directive. It flags any metric it cannot confirm from the penetration data as ESTIMATED.'},
+    {step:'Who it reports on',body:'All 6 CSOps reps. Primary accountability focus on Kala McNeely and Samantha Marcus who coach directly from this document. Every action must be executable Monday morning.'},
+    {step:'What you get',body:'Execution assessment, rep-level accountability gaps with ESTIMATED flags where penetration is incomplete, this week\'s directive, and up to two watchouts. No generic language. No metric restatement.'}
+  ];
+  return`
+    <div class="fade" style="background:var(--card);border:1.5px solid ${state.brunoOutput?NAVY:'var(--blue-border)'};border-radius:12px;overflow:hidden;margin-bottom:16px;box-shadow:0 1px 4px #0000000a;">
+      <div style="padding:18px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div style="width:40px;height:40px;border-radius:10px;background:${state.brunoOutput?NAVY_PALE:'var(--blue-bg)'};border:1.5px solid ${state.brunoOutput?NAVY:'var(--blue)'};display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:${NAVY};">B</div>
+          <div>
+            <div style="font-size:10px;font-weight:600;color:${state.brunoOutput?'var(--success)':'var(--blue)'};letter-spacing:0.1em;text-transform:uppercase;margin-bottom:2px;">${state.brunoOutput?'Complete · Execution Evaluated':'Layer 2 · Coaching Execution Evaluation'}</div>
+            <div style="font-size:14px;font-weight:700;color:${NAVY};">RUN BRUNO</div>
+          </div>
+        </div>
+        <button onclick="toggleBruno()" style="background:none;border:none;color:var(--text-muted);font-size:16px;cursor:pointer;">✕</button>
+      </div>
+      <div style="padding:18px 24px;">
+        <div style="display:flex;gap:6px;margin-bottom:14px;">
+          ${BGUIDE.map((g,i)=>`
+            <button class="guide-btn" onclick="setBrunoGuide(${i})" style="flex:1;background:${state.brunoGuideStep===i?NAVY_PALE:'var(--card-alt)'};border:1.5px solid ${state.brunoGuideStep===i?NAVY:'var(--border)'};border-radius:6px;padding:8px 6px;font-size:10px;font-weight:${state.brunoGuideStep===i?600:400};color:${state.brunoGuideStep===i?NAVY:'var(--text-muted)'};cursor:pointer;text-align:center;font-family:'Inter',system-ui,sans-serif;">
+              ${i+1}. ${g.step.split(' ').slice(0,2).join(' ')}
+            </button>
+          `).join('')}
+        </div>
+        <div style="background:${NAVY_PALE};border:1px solid ${NAVY}22;border-radius:8px;padding:14px 16px;margin-bottom:16px;">
+          <div style="font-size:11px;font-weight:600;color:${NAVY};margin-bottom:6px;">${BGUIDE[state.brunoGuideStep].step}</div>
+          <p style="font-size:12px;color:var(--text-mid);line-height:1.7;margin:0;">${BGUIDE[state.brunoGuideStep].body}</p>
+        </div>
+        ${state.brunoError?`<div style="background:var(--danger-bg);border:1px solid var(--danger-border);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:var(--danger);">${state.brunoError}</div>`:''}
+        ${state.brunoOutput?`
+          <div class="fade" style="margin-bottom:14px;">
+            <div style="background:${NAVY_PALE};border:1px solid ${NAVY}22;border-radius:8px;padding:14px 16px;margin-bottom:10px;">
+              <div style="font-size:10px;font-weight:600;color:${NAVY};text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">Execution Assessment</div>
+              <p style="font-size:12px;color:var(--text-mid);line-height:1.7;margin:0;">${state.brunoOutput.executionAssessment||'—'}</p>
+            </div>
+            ${(state.brunoOutput.repAccountability||[]).map(rep=>`
+              <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:8px;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                  <div style="width:28px;height:28px;border-radius:50%;background:${NAVY_PALE};border:1.5px solid ${NAVY}33;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:${NAVY};">${ini(rep.name)}</div>
+                  <div style="font-size:13px;font-weight:600;color:${NAVY};">${rep.name}</div>
+                </div>
+                <p style="font-size:12px;color:var(--text-muted);line-height:1.6;margin:0 0 8px;">${rep.finding}</p>
+                ${(rep.estimatedMetrics||[]).length>0?`<div style="background:var(--warning-bg);border:1px solid var(--warning-border);border-radius:4px;padding:6px 10px;margin-bottom:8px;font-size:10px;color:var(--warning);">ESTIMATED: ${rep.estimatedMetrics.join(' · ')}</div>`:''}
+                ${(rep.actions||[]).map(a=>`<div style="display:flex;gap:8px;margin-bottom:6px;"><span style="font-size:11px;color:${NAVY};flex-shrink:0;font-weight:600;">→</span><span style="font-size:12px;color:var(--text-mid);line-height:1.5;">${a}</span></div>`).join('')}
+              </div>
+            `).join('')}
+            ${(state.brunoOutput.watchouts||[]).map((w,i)=>`
+              <div style="background:var(--danger-bg);border:1px solid var(--danger-border);border-radius:8px;padding:12px 14px;margin-bottom:8px;">
+                <div style="font-size:10px;font-weight:700;color:var(--danger);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px;">Watchout ${i+1}</div>
+                <p style="font-size:12px;color:var(--text-mid);line-height:1.6;margin:0;">${w}</p>
+              </div>
+            `).join('')}
+          </div>
+        `:''}
+        <button onclick="runBruno()" ${state.brunoRunning?'disabled':''} style="width:100%;padding:13px;border-radius:8px;border:none;background:${state.brunoRunning?'#e2e8f0':`linear-gradient(135deg,${NAVY_DARK},${NAVY_MID})`};color:${state.brunoRunning?'var(--text-light)':'#fff'};font-size:13px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;cursor:${state.brunoRunning?'not-allowed':'pointer'};display:flex;align-items:center;justify-content:center;gap:10px;box-shadow:${state.brunoRunning?'none':'0 2px 8px #24345440'};transition:all 0.2s;font-family:'Inter',system-ui,sans-serif;">
+          ${state.brunoRunning?`<div style="width:13px;height:13px;border:2px solid #bfdbfe;border-top:2px solid var(--blue);border-radius:50%;animation:spin 0.8s linear infinite;"></div> RUN BRUNO Evaluating... <span id="timer-display">${state.secs}s</span>`:`${state.brunoOutput?'▶  Re-Run BRUNO':'▶  RUN BRUNO'}`}
+        </button>
+      </div>
+    </div>`;
+}
+
+// ============================================================
+// DEMO MODE
+// ============================================================
+function runDemo(){
+  const pack=buildDemoPack();
+  state.pack=pack;
+  state.hankDone=true;
+  state.demoMode=true;
+  state.activeTab=0;
+  state.dlDone=false;
+  state.brunoOutput=null;
+  state.brunoOpen=false;
+  // Populate segData with mock entries
+  const mockSeg=(rep,n,prefix)=>Array.from({length:n},(_,i)=>({
+    agreementNum:`E-${100000+i+1}`,
+    client:`${prefix} Account ${i+1}`,
+    rep,subtotal:Math.round(1200+Math.random()*8000),
+    saleItems:'Digital Advertising + Print',
+    digital:i%3!==0,
+    _health_base:Math.round(40+Math.random()*40),
+    contacted:'',contactType:'',contactDate:'',statusField:'',blocker:'',
+    nextStep:'',nextStepDate:'',outcome:'',idp:'',notes:''
+  }));
+  state.segData={
+    declined:CS_REP_NAMES.flatMap(n=>mockSeg(n,7,'Declined')),
+    printOnly:CS_REP_NAMES.flatMap(n=>mockSeg(n,5,'Print')),
+    renewable:CS_REP_NAMES.flatMap(n=>mockSeg(n,10,'Renewable'))
+  };
+  render();
+}
+
+// ============================================================
+// EVENT HANDLERS
+// ============================================================
+function attachEventListeners(){
+  // Drag and drop on slots
+  FILE_SLOTS.forEach(slot=>{
+    const el=$(`slot-${slot.id}`);
+    if(!el)return;
+    el.ondragover=e=>{e.preventDefault();el.style.borderColor=NAVY;el.style.background=NAVY_PALE;};
+    el.ondragleave=()=>{if(!state.files[slot.id]){el.style.borderColor='';el.style.background='';}};
+    el.ondrop=e=>{
+      e.preventDefault();
+      const f=e.dataTransfer.files[0];
+      if(f){state.files[slot.id]=f;render();}
+    };
+  });
+}
+
+function handleFileInput(slotId,input){
+  if(input.files[0]){
+    state.files[slotId]=input.files[0];
+    render();
+  }
+}
+
+function setTab(i){state.activeTab=i;render();}
+function setSegCat(cat){state.segCategory=cat;render();}
+function toggleBruno(){state.brunoOpen=!state.brunoOpen;render();}
+function setBrunoGuide(i){state.brunoGuideStep=i;render();}
+function updateManual(name,val){state.manualContexts[name]=val;}
+
+function updateSeg(category,idx,field,value){
+  state.segData[category][idx][field]=value;
+  // No full re-render needed for inline edits — just update the data
+}
+
+function resetAll(){
+  state.files={};state.hankDone=false;state.hankError=null;state.activeTab=0;
+  state.brunoOpen=false;state.brunoOutput=null;state.brunoError=false;state.dlDone=false;
+  state.manualContexts={};state.pack=null;state.segData={declined:[],printOnly:[],renewable:[]};
+  state.upsellLog=[];state.demoMode=false;
+  render();
+}
+
+// ============================================================
+// INIT
+// ============================================================
+render();
+</script>
+<script src="bvm-bot.js"></script>
+</body>
+</html>
