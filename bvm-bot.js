@@ -14,11 +14,11 @@
 - Account health scoring and segmentation
 - Bandwidth tracking for CS managers
 
-You support three leaders: Ted (manager/VP), Kala (CS team with Genele and Karen), and Samantha (CS team with April and Alex). The book of business is $38M. You have context from the weekly Gatekeeper executive pack — renewal report data, health scores, at-risk flags, and coaching summaries.
+You support three leaders: Ted (manager/VP), Kala (CS team with Genele and Karen), and Samantha (CS team with April and Alex). The book of business is $38M. You have context from the weekly Gatekeeper executive pack -- renewal report data, health scores, at-risk flags, and coaching summaries.
 
 Be direct, concise, and playbook-driven. Lead with the action. No fluff. You are a hound dog on at-risk accounts.`;
 
-  // ── Styles ──────────────────────────────────────────────
+  // -- Styles ----------------------------------------------
   const style = document.createElement('style');
   style.textContent = `
     #bvm-fab {
@@ -165,13 +165,13 @@ Be direct, concise, and playbook-driven. Lead with the action. No fluff. You are
   `;
   document.head.appendChild(style);
 
-  // ── FAB Button ───────────────────────────────────────────
+  // -- FAB Button -------------------------------------------
   const fab = document.createElement('div');
   fab.id = 'bvm-fab';
   fab.innerHTML = `<img src="${AVATAR}" alt="BVM Bot">`;
   document.body.appendChild(fab);
 
-  // ── Chat Panel ───────────────────────────────────────────
+  // -- Chat Panel -------------------------------------------
   const panel = document.createElement('div');
   panel.id = 'bvm-panel';
   panel.innerHTML = `
@@ -179,13 +179,13 @@ Be direct, concise, and playbook-driven. Lead with the action. No fluff. You are
       <div id="bvm-header-avatar"><img src="${AVATAR}" alt="BVM Bot"></div>
       <div>
         <div id="bvm-header-name">${BOT_NAME}</div>
-        <div id="bvm-header-status"><div id="bvm-status-dot"></div><span>Online · BVM CS Playbook</span></div>
+        <div id="bvm-header-status"><div id="bvm-status-dot"></div><span>Online . BVM CS Playbook</span></div>
       </div>
       <button id="bvm-close">&#x2715;</button>
     </div>
     <div id="bvm-messages"></div>
     <div id="bvm-input-row">
-      <input id="bvm-input" type="text" placeholder="Ask BVM Bot anything…" />
+      <input id="bvm-input" type="text" placeholder="Ask BVM Bot anything..." />
       <button id="bvm-send">
         <svg viewBox="0 0 24 24" fill="none" stroke="#1B2F5E" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <line x1="22" y1="2" x2="11" y2="13"/>
@@ -196,7 +196,7 @@ Be direct, concise, and playbook-driven. Lead with the action. No fluff. You are
   `;
   document.body.appendChild(panel);
 
-  // ── State ─────────────────────────────────────────────────
+  // -- State -------------------------------------------------
   let history = [];
   let isOpen = false;
 
@@ -204,14 +204,14 @@ Be direct, concise, and playbook-driven. Lead with the action. No fluff. You are
     isOpen = !isOpen;
     panel.classList.toggle('open', isOpen);
     if (isOpen && history.length === 0) {
-      addMessage("Hey — I've got the renewal report loaded. What do you need?", 'bot');
+      addMessage("Hey -- I've got the renewal report loaded. What do you need?", 'bot');
     }
   }
 
   fab.addEventListener('click', togglePanel);
   panel.querySelector('#bvm-close').addEventListener('click', togglePanel);
 
-  // ── Messaging ─────────────────────────────────────────────
+  // -- Messaging ---------------------------------------------
   function addMessage(text, role) {
     const msgs = document.getElementById('bvm-messages');
     const div = document.createElement('div');
@@ -231,7 +231,7 @@ Be direct, concise, and playbook-driven. Lead with the action. No fluff. You are
     history.push({ role: 'user', content: text });
     input.value = '';
 
-    const thinking = addMessage('thinking…', 'thinking');
+    const thinking = addMessage('thinking...', 'thinking');
 
     try {
       const res = await fetch(PROXY_URL, {
@@ -245,13 +245,13 @@ Be direct, concise, and playbook-driven. Lead with the action. No fluff. You are
         })
       });
       const data = await res.json();
-      const reply = data.content?.[0]?.text || 'Something went wrong — check the proxy.';
+      const reply = data.content?.[0]?.text || 'Something went wrong -- check the proxy.';
       thinking.remove();
       addMessage(reply, 'bot');
       history.push({ role: 'assistant', content: reply });
     } catch (err) {
       thinking.remove();
-      addMessage('Connection error — is the Vercel proxy up?', 'bot');
+      addMessage('Connection error -- is the Vercel proxy up?', 'bot');
     }
   }
 
