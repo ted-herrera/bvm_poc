@@ -7,8 +7,6 @@
 <!-- xlsx.js removed: file parsing is now handled by the Flask backend -->
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"/>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 body{background:#f1f5f9;min-height:100vh;font-family:'Inter',system-ui,sans-serif;color:#0f172a;}
@@ -664,17 +662,7 @@ function sparkPoints(name,score){
   return pts;
 }
 
-let _riskMap=null;
-function initRiskMap(riskPct){
-  const el=document.getElementById('risk-map-container');
-  if(!el)return;
-  if(_riskMap){_riskMap.remove();_riskMap=null;}
-  _riskMap=L.map('risk-map-container',{
-    zoomControl:false,attributionControl:false,
-    dragging:true,scrollWheelZoom:false,
-    doubleClickZoom:false,boxZoom:false,keyboard:false
-  }).setView([39.5,-98.35],3);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{maxZoom:10}).addTo(_riskMap);
+function choroplethSVG(riskPct){
   const r=Math.min(riskPct||0,100)/100;
   const col=v=>{
     if(v<0.15)return'#4ade80';
@@ -683,20 +671,19 @@ function initRiskMap(riskPct){
     if(v<0.70)return'#fb923c';
     return'#ef4444';
   };
+  // 6 simplified US regions as rough blocks
   const regions=[
-    {name:'West',   bounds:[[32,-124],[49,-104]],i:r*0.55},
-    {name:'Midwest',bounds:[[36,-104],[49,-80]], i:r*0.90},
-    {name:'NE',     bounds:[[40,-80], [47,-67]], i:r*1.05},
-    {name:'SW',     bounds:[[25,-124],[36,-94]], i:r*0.50},
-    {name:'South',  bounds:[[25,-94], [36,-77]], i:r*0.72},
-    {name:'SE',     bounds:[[25,-82], [36,-67]], i:r*0.85},
+    {x:10, y:10,w:100,h:90, i:r*0.55, label:'West'},
+    {x:115,y:10,w:100,h:90, i:r*0.90, label:'Midwest'},
+    {x:220,y:10,w:80, h:80, i:r*1.05, label:'NE'},
+    {x:10, y:105,w:100,h:80,i:r*0.50, label:'SW'},
+    {x:115,y:105,w:100,h:80,i:r*0.72, label:'South'},
+    {x:220,y:95, w:80, h:90,i:r*0.85, label:'SE'},
   ];
-  regions.forEach(({name,bounds,i})=>{
-    L.rectangle(bounds,{
-      color:'white',weight:1.5,
-      fillColor:col(Math.min(i,1)),fillOpacity:0.75
-    }).bindTooltip('<b>'+name+'</b> &mdash; Risk: '+Math.round(i*100)+'%',{sticky:true}).addTo(_riskMap);
-  });
+  return regions.map(({x,y,w,h,i,label})=>`
+    <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="${col(Math.min(i,1))}" opacity="0.85" stroke="white" stroke-width="1.5"/>
+    <text x="${x+w/2}" y="${y+h/2+4}" text-anchor="middle" fill="white" font-size="11" font-weight="700" font-family="Inter,sans-serif" opacity="0.9">${label}</text>
+  `).join('');
 }
 
 function buildDemoPack(){
@@ -1015,7 +1002,6 @@ function render(){
   `;
   attachEventListeners();
   if(state.hankRunning)renderHankProgress();
-  if(state.hankDone&&state.activeTab===0)setTimeout(()=>initRiskMap(state.pack&&state.pack.dashboard?state.pack.dashboard.riskPct||0:0),80);
 }
 
 function renderHeader(){
@@ -1616,8 +1602,11 @@ function renderDashboard(){
         <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px;">
           <div style="font-size:9px;font-weight:700;color:${NAVY};letter-spacing:0.14em;text-transform:uppercase;margin-bottom:10px;">Portfolio Risk — National View</div>
           <div style="background:var(--card-alt);border:1px solid var(--border);border-radius:8px;overflow:hidden;position:relative;">
-            <div id="risk-map-container" style="width:100%;height:200px;border-radius:8px;"></div>
-            <div style="position:absolute;bottom:6px;right:8px;font-size:9px;color:#333;background:rgba(255,255,255,0.92);padding:2px 7px;border-radius:4px;font-family:'JetBrains Mono',monospace;z-index:1000;">Risk ${fmtPct(d.riskPct)}</div>
+            <svg viewBox="0 0 310 200" style="width:100%;height:auto;display:block;">
+              <rect x="0" y="0" width="310" height="200" fill="#f8fafc"/>
+              ${choroplethSVG(d.riskPct)}
+            </svg>
+            <div style="position:absolute;bottom:6px;right:8px;font-size:9px;color:var(--text-muted);background:rgba(255,255,255,0.92);padding:2px 7px;border-radius:4px;font-family:'JetBrains Mono',monospace;">Risk ${fmtPct(d.riskPct)}</div>
           </div>
           <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap;">
             ${[['Low','#4ade80'],['Moderate','#facc15'],['High','#fb923c'],['Critical','#ef4444']].map(([l,c])=>`<div style="display:flex;align-items:center;gap:4px;"><div style="width:9px;height:9px;border-radius:2px;background:${c};"></div><span style="font-size:9px;color:var(--text-muted);">${l}</span></div>`).join('')}
